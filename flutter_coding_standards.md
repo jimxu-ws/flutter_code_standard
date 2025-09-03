@@ -1597,7 +1597,7 @@ class MyWidget extends StatelessWidget {
 ## 4. 数据模型规范
 
 ### 4.1 推荐库
-- **数据类**：使用 `freezed` 库
+- **数据类**：使用 `freezed` 库，对于状态模型，推荐使用 `freezed`；其他模型，如果不是“不可变”，推荐使用 `json_annotation`或者手写
 - **JSON序列化**：使用 `json_serializable` 库
 - **强类型校验**：所有JSON转换必须有强类型校验
 ```yaml
