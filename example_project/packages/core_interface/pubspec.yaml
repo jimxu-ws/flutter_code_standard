@@ -1,0 +1,26 @@
+name: core_interface
+description: 核心接口包，定义所有模块间的通信契约
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  # 基础依赖
+  meta: ^1.11.0
+  
+  # 路由相关
+  go_router: ^13.2.0
+  
+  # 状态管理
+  flutter_riverpod: ^2.4.9
+
+dev_dependencies:
+  # 代码生成
+  build_runner: ^2.4.7
+  
+  # 测试
+  flutter_test:
+    sdk: flutter
+  mocktail: ^1.0.2

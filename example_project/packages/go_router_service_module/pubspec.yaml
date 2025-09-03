@@ -1,0 +1,21 @@
+name: go_router_service_module
+description: An implementation of the NavigationService using the go_router package.
+version: 0.0.1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.2.6 <4.0.0'
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  core_interface:
+    path: ../core_interface
+  go_router: ^13.2.0
+  get_it: ^7.6.7
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1

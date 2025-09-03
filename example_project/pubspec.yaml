@@ -1,0 +1,53 @@
+name: example_project
+description: Flutter 模块解耦最佳实践示例项目
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 🎯 核心接口包
+  core_interface:
+    path: packages/core_interface
+  
+  # 📦 业务模块
+  user_module:
+    path: packages/user_module
+  network_module:
+    path: packages/network_module
+  storage_module:
+    path: packages/storage_module
+  go_router_service_module:
+    path: packages/go_router_service_module
+  home_module:
+    path: packages/home_module
+
+  # UI & State Management
+  flutter_riverpod: ^2.4.9
+  flutter_hooks: ^0.20.3
+  hooks_riverpod: ^2.4.9
+  
+  # 🎨 UI 组件
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  
+  # 🔧 代码生成
+  build_runner: ^2.4.7
+  injectable_generator: ^2.4.1
+  
+  # 📝 代码质量
+  flutter_lints: ^3.0.1
+  
+  # 🧪 测试工具
+  mocktail: ^1.0.2
+
+flutter:
+  uses-material-design: true
