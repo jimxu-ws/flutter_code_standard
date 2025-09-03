@@ -349,7 +349,7 @@ class OrderScreen extends StatelessWidget {
 
 ## 结论
 
-**方案二 + 方案三 = 完美解耦的路由架构**：
+**完美解耦的路由架构**：
 
 - ✅ 模块自治：自己注册路由
 - ✅ 依赖倒置：跳转通过接口
@@ -357,5 +357,3 @@ class OrderScreen extends StatelessWidget {
 - ✅ 易于测试与维护
 
 这是大型 Flutter 应用在模块化、微前端、独立仓库场景下的**推荐标准做法**。
-
-如需，我可提供完整可运行的 GitHub 示例项目结构或模板。是否需要？
