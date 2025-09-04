@@ -164,9 +164,10 @@ lib/
 ## 3. 状态管理规范
 
 ### 3.1 状态管理选择原则
+凡是需要状态的地方，才能选择使用Provider进行状态管理，但还需视是否复杂而选择hooks方案。
 - **跨页面状态**：使用 Provider
-- **单页面内状态**：使用 Hooks
-- **注意事项**：这两种方案都必须是和状态有关的，避免没有管理状态的Provider或者Hooks；禁止使用其他状态管理方案
+- **单页面内状态**：优先使用 Hooks，复杂情形也可以使用Provider
+- **注意事项**：这两种方案都必须是和状态有关的，避免没有管理状态的Provider或者Hooks；禁止使用其他状态管理方案;Provider只应该有build及side effect函数，不应该含有其他逻辑。选择性的状态管理优先使用FamilyProvider：即带参数的Provider
 
 #### 3.1.1 状态管理选择示例
 
@@ -340,28 +341,6 @@ class MyWidget extends HookWidget {
 }
 ```
 
-###### 错误示例3：在单页面内使用 Provider 管理简单状态
-```dart
-// ❌ 错误：简单的表单状态使用 Provider 过度设计
-final formStateProvider = StateNotifierProvider<FormStateNotifier, FormState>((ref) {
-  return FormStateNotifier();
-});
-
-class FormStateNotifier extends StateNotifier<FormState> {
-  FormStateNotifier() : super(FormState.initial());
-  
-  void updateEmail(String email) {
-    state = state.copyWith(email: email);
-  }
-  
-  void updatePassword(String password) {
-    state = state.copyWith(password: password);
-  }
-}
-
-// 这种简单状态更适合使用 Hooks
-```
-
 #### 3.1.2 状态管理选择决策树
 
 ```
@@ -376,26 +355,6 @@ class FormStateNotifier extends StateNotifier<FormState> {
 └─ 否
    └─ 不需要状态管理，使用普通 Widget ❌
 ```
-
-#### 3.1.3 最佳实践总结
-
-##### 🎯 Provider 适用场景
-- **用户认证状态**：登录、登出、用户信息
-- **应用配置**：主题、语言、设置
-- **全局数据**：购物车、待办事项、通知
-- **复杂业务逻辑**：数据流、状态机、缓存管理
-
-##### 🎯 Hooks 适用场景
-- **表单状态**：输入验证、提交状态
-- **UI 状态**：展开/收起、显示/隐藏
-- **动画状态**：进度条、加载动画
-- **临时状态**：页面内临时数据
-
-##### 🚫 避免场景
-- **静态数据**：不需要状态管理的静态信息
-- **工具函数**：没有状态的纯函数服务
-- **过度设计**：简单状态使用复杂的状态管理
-- **混合使用**：同一功能模块混用多种状态管理方案
 
 ### 3.2 Provider 设计原则
 - **职责单一**：Provider 应该只包含：
@@ -426,17 +385,6 @@ class MyWidget extends ConsumerWidget {
     );
   }
 }
-
-// ❌ 错误：在 build 方法中调用 ref.read
-class MyWidget extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 这会导致重复调用和状态混乱
-    ref.read(myFutureProvider);
-    return Container();
-  }
-}
-```
 
 #### 3.3.2 AsyncNotifier 使用规范
 ```dart
@@ -479,36 +427,7 @@ class UserNotifier extends AsyncNotifier<User> {
 
 #### 3.3.3 避免 "Future already completed" 错误的规范
 
-##### 方案一：使用 mounted 属性（推荐）
-```dart
-class UserNotifier extends AsyncNotifier<User> {
-  @override
-  Future<User> build() async {
-    return await _fetchUser();
-  }
-
-  Future<void> refreshUser() async {
-    // ✅ 使用 mounted 检查组件是否还在树中
-    if (!mounted) return;
-    
-    state = const AsyncValue.loading();
-    
-    try {
-      final user = await _fetchUser();
-      
-      // ✅ 再次检查是否还在树中
-      if (!mounted) return;
-      
-      state = AsyncValue.data(user);
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      state = AsyncValue.error(error, stackTrace);
-    }
-  }
-}
-```
-
-##### 方案二：使用 CancelToken 模式
+##### 方案一：使用 CancelToken 模式
 ```dart
 class UserNotifier extends AsyncNotifier<User> {
   CancelToken? _cancelToken;
@@ -552,7 +471,7 @@ class UserNotifier extends AsyncNotifier<User> {
 }
 ```
 
-##### 方案三：使用 Riverpod 内置的 ref.onDispose
+##### 方案二：使用 Riverpod 内置的 ref.onDispose
 ```dart
 class UserNotifier extends AsyncNotifier<User> {
   bool _isDisposed = false;
@@ -584,64 +503,6 @@ class UserNotifier extends AsyncNotifier<User> {
   }
 }
 ```
-
-##### 方案四：使用 AutoDispose 修饰符（推荐）
-```dart
-// Riverpod 2.x 版本使用方式
-final userProvider = StateNotifierProvider.autoDispose<UserNotifier, AsyncValue<User>>((ref) {
-  return UserNotifier();
-});
-
-class UserNotifier extends StateNotifier<AsyncValue<User>> {
-  UserNotifier() : super(const AsyncValue.loading());
-  
-  Future<void> refreshUser() async {
-    state = const AsyncValue.loading();
-    
-    try {
-      final user = await _fetchUser();
-      state = AsyncValue.data(user);
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
-    }
-  }
-}
-
-// Riverpod 3.x 版本使用方式（如果支持）
-@riverpod
-class UserNotifier extends _$UserNotifier {
-  @override
-  Future<User> build() async {
-    return await _fetchUser();
-  }
-
-  Future<void> refreshUser() async {
-    state = const AsyncValue.loading();
-    
-    try {
-      final user = await _fetchUser();
-      state = AsyncValue.data(user);
-    } catch (error, stackTrace) {
-      state = AsyncValue.error(error, stackTrace);
-    }
-  }
-}
-
-// 使用方式
-final userProvider = userNotifierProvider.autoDispose;
-```
-
-##### 最佳实践总结
-- **Riverpod 2.x**：优先使用 `mounted` 属性 + `StateNotifierProvider.autoDispose`
-- **Riverpod 3.x**：可以使用 `@riverpod` 注解 + `autoDispose` 修饰符
-- **通用方案**：使用 `mounted` 属性检查，简单有效且对注解友好
-- **复杂场景**：结合使用 `CancelToken` 模式
-- **避免手动管理 disposed 状态**：容易出错且对注解不友好
-
-##### 版本兼容性说明
-- **Riverpod 2.x**：支持 `StateNotifierProvider.autoDispose` 和 `FutureProvider.autoDispose`
-- **Riverpod 3.x**：支持 `@riverpod` 注解和 `autoDispose` 修饰符
-- **Flutter Hooks**：所有版本都支持 `mounted` 属性检查
 
 ### 3.4 Hooks 使用规范
 - **最佳实践**：遵循 Flutter Hooks 的使用规则
@@ -730,26 +591,13 @@ class BadEffectWidget extends HookWidget {
       fetchUser(counter.value); // 使用了 counter.value 但没有在依赖数组中
     }, []); // 空依赖数组
     
-    // ❌ 错误：依赖数组包含对象，可能导致无限循环
-    useEffect(() {
-      updateUser(user.value);
-    }, [user.value]); // user.value 是对象，每次都是新的引用
-    
     // ✅ 正确：明确的依赖数组
     useEffect(() {
       if (counter.value > 0) {
         fetchUser(counter.value);
       }
     }, [counter.value]); // 明确依赖 counter.value
-    
-    // ✅ 正确：使用 useMemoized 避免对象引用问题
-    final userKey = useMemoized(() => user.value?.id, [user.value?.id]);
-    useEffect(() {
-      if (userKey != null) {
-        updateUser(user.value!);
-      }
-    }, [userKey]); // 依赖 userKey 而不是整个 user 对象
-    
+
     return Container();
   }
 }
@@ -899,52 +747,6 @@ class OptimizedHooksWidget extends HookWidget {
 - **对象依赖问题**：依赖数组中包含对象引用
 - **资源未清理**：useEffect 没有返回清理函数
 - **异步状态更新**：在已销毁的组件上更新状态
-
-#### 3.3.4 常见错误预防清单
-- **✅ 正确做法**：
-  - 在 `build` 方法中使用 `ref.watch` 监听状态变化
-  - 在事件回调中使用 `ref.read` 调用方法
-  - 异步操作前检查组件是否已被销毁
-  - 使用 `AsyncValue.loading()` 设置加载状态
-  - 正确处理异步操作的错误状态
-
-- **❌ 错误做法**：
-  - 在 `build` 方法中调用 `ref.read`
-  - 在异步操作完成后不检查组件状态
-  - 重复设置相同的状态值
-  - 在已销毁的组件上更新状态
-  - 忽略异步操作的错误处理
-
-### 3.4 Hooks 使用规范
-- **最佳实践**：遵循 Flutter Hooks 的使用规则
-- **适用场景**：带状态依赖的简单逻辑封装
-- **示例**：
-```dart
-class MyWidget extends HookWidget {
-  @override
-  Widget build(BuildContext context) {
-    final counter = useState(0);
-    final isLoading = useState(false);
-    
-    useEffect(() {
-      // 副作用逻辑
-      return () {
-        // 清理逻辑
-      };
-    }, [counter.value]);
-    
-    return Column(
-      children: [
-        Text('Count: ${counter.value}'),
-        ElevatedButton(
-          onPressed: () => counter.value++,
-          child: Text('Increment'),
-        ),
-      ],
-    );
-  }
-}
-```
 
 ### 3.5 WidgetRef 和 Ref 使用规范
 
@@ -1172,45 +974,6 @@ class MyWidget extends ConsumerWidget {
 }
 ```
 
-###### 方案三：使用 Notifier 方法
-```dart
-class UserNotifier extends AsyncNotifier<User> {
-  @override
-  Future<User> build() async {
-    return await _fetchUser();
-  }
-
-  Future<void> refreshUser() async {
-    state = const AsyncValue.loading();
-    
-    try {
-      final user = await _fetchUser();
-      
-      // ✅ 正确：在 Notifier 中安全地更新状态
-      if (!mounted) return;
-      state = AsyncValue.data(user);
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      state = AsyncValue.error(error, stackTrace);
-    }
-  }
-}
-
-// 使用方式
-class MyWidget extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ElevatedButton(
-      onPressed: () {
-        // ✅ 正确：调用 Notifier 方法，让 Notifier 处理异步逻辑
-        ref.read(userProvider.notifier).refreshUser();
-      },
-      child: Text('Refresh User'),
-    );
-  }
-}
-```
-
 ##### 🎯 最佳实践总结
 
 ###### ✅ 推荐的做法
@@ -1255,7 +1018,6 @@ Riverpod 在以下场景中确实存在局限性：
 - **原生插件集成**：插件内部无法访问 Riverpod 上下文
 - **模块化隔离**：跨模块的 Provider 依赖复杂
 - **第三方库集成**：外部库无法感知 Riverpod 状态
-
 
 #### 3.6.2 模块化隔离下Riverpod最佳实践
 
@@ -1600,24 +1362,6 @@ class MyWidget extends StatelessWidget {
 - **数据类**：使用 `freezed` 库，对于状态模型，推荐使用 `freezed`；其他模型，如果不是“不可变”，推荐使用 `json_annotation`或者手写
 - **JSON序列化**：使用 `json_serializable` 库
 - **强类型校验**：所有JSON转换必须有强类型校验
-```yaml
-      json_serializable:
-        options:
-          # 启用运行时类型检查（推荐开发时开启）
-          checked: true
-
-          # 显式调用对象的 toJson() 方法（处理嵌套对象/集合时很重要）
-          explicit_to_json: true
-
-          # 禁止 JSON 中出现未定义的字段（反序列化时抛出异常）
-          disallow_unrecognized_keys: true
-
-          # 生成 fromJson 工厂方法
-          create_factory: true
-
-          # 生成 toJson 方法
-          create_to_json: true
-```
 
 ### 4.2 JSON 序列化类型安全和错误处理规范
 
@@ -1956,20 +1700,6 @@ class UserService {
 - 主分支保持稳定
 - 功能开发使用功能分支
 - 及时合并和清理分支
-
-## 10. 部署规范
-
-### 10.1 构建配置
-- 区分开发、测试、生产环境
-- 使用不同的配置文件
-- 构建产物要进行签名
-
-### 10.2 发布流程
-- 自动化构建和测试
-- 版本号管理规范
-- 发布前进行充分测试
-
----
 
 ## 总结
 
