@@ -10,6 +10,7 @@ import 'user_detail_screen.dart';
 import 'posts_screen.dart';
 import 'user_search_screen.dart';
 import 'provider_comparison_screen.dart';
+import 'cache_debug_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,6 +22,20 @@ class HomeScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Query Provider Example'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.bug_report),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CacheDebugScreen(),
+                  ),
+                );
+              },
+              tooltip: 'Cache Debug',
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Users', icon: Icon(Icons.people)),

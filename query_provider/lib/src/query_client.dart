@@ -2,13 +2,18 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'query_cache.dart';
+
 /// A client for managing query cache and global operations
 class QueryClient {
-  QueryClient({ProviderContainer? container})
-      : _container = container ?? ProviderContainer();
+  QueryClient({
+    ProviderContainer? container,
+    QueryCache? cache,
+  })  : _container = container ?? ProviderContainer(),
+        _cache = cache ?? getGlobalQueryCache();
 
   final ProviderContainer _container;
-  final Map<String, Timer> _cacheTimers = {};
+  final QueryCache _cache;
   final Map<String, Timer> _refetchTimers = {};
 
   /// Invalidate queries by key pattern
@@ -35,9 +40,14 @@ class QueryClient {
 
   /// Remove queries from cache by key pattern
   void removeQueries(String keyPattern) {
+    // Remove from cache
+    final removedCount = _cache.removeByPattern(keyPattern);
+    
+    // Invalidate matching providers
     invalidateQueries(keyPattern);
+    
     // Cancel any associated timers
-    _cacheTimers.removeWhere((key, timer) {
+    _refetchTimers.removeWhere((key, timer) {
       if (key.contains(keyPattern)) {
         timer.cancel();
         return true;
@@ -46,37 +56,45 @@ class QueryClient {
     });
   }
 
-  /// Set query data manually
-  void setQueryData<T>(ProviderBase<T> provider, T data) {
-    // Note: In a real implementation, you'd need to update the provider's state
-    // This would require access to the provider's notifier
-    // For now, we'll invalidate the provider to trigger a refetch
-    _container.invalidate(provider);
+  /// Set query data manually in cache
+  void setQueryData<T>(String queryKey, T data) {
+    _cache.setData(queryKey, data);
   }
 
-  /// Get query data
-  T? getQueryData<T>(ProviderBase<T> provider) {
-    try {
-      return _container.read(provider);
-    } catch (e) {
-      return null;
-    }
+  /// Get query data from cache
+  T? getQueryData<T>(String queryKey) {
+    final entry = _cache.get<T>(queryKey);
+    return entry?.hasData == true ? entry!.data as T : null;
   }
 
-  /// Prefetch a query
-  Future<T> prefetchQuery<T>(
-    ProviderBase<Future<T>> provider,
-  ) async {
-    return _container.read(provider);
+  /// Get cache entry with metadata
+  QueryCacheEntry<T>? getCacheEntry<T>(String queryKey) {
+    return _cache.get<T>(queryKey);
   }
 
-  /// Schedule cache cleanup for a query
-  void scheduleCacheCleanup(String key, Duration cacheTime) {
-    _cacheTimers[key]?.cancel();
-    _cacheTimers[key] = Timer(cacheTime, () {
-      // Remove from cache
-      _cacheTimers.remove(key);
-    });
+  /// Check if query data exists in cache
+  bool hasQueryData(String queryKey) {
+    return _cache.containsKey(queryKey);
+  }
+
+  /// Get cache statistics
+  QueryCacheStats getCacheStats() {
+    return _cache.stats;
+  }
+
+  /// Clear all cache entries
+  void clearCache() {
+    _cache.clear();
+  }
+
+  /// Cleanup expired cache entries
+  int cleanupCache() {
+    return _cache.cleanup();
+  }
+
+  /// Get all cache keys
+  List<String> getCacheKeys() {
+    return _cache.keys;
   }
 
   /// Schedule automatic refetch for a query
@@ -93,15 +111,12 @@ class QueryClient {
 
   /// Dispose the client and clean up resources
   void dispose() {
-    for (final timer in _cacheTimers.values) {
-      timer.cancel();
-    }
     for (final timer in _refetchTimers.values) {
       timer.cancel();
     }
-    _cacheTimers.clear();
     _refetchTimers.clear();
     _container.dispose();
+    // Note: We don't dispose the cache here as it might be shared
   }
 }
 

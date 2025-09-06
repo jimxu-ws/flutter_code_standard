@@ -8,6 +8,8 @@ class QueryOptions<T> {
     this.cacheTime = const Duration(minutes: 30),
     this.refetchOnMount = true,
     this.refetchOnWindowFocus = false,
+    this.refetchOnAppFocus = true,
+    this.pauseRefetchInBackground = true,
     this.refetchInterval,
     this.retry = 3,
     this.retryDelay = const Duration(seconds: 1),
@@ -28,6 +30,12 @@ class QueryOptions<T> {
 
   /// Whether to refetch when the window regains focus
   final bool refetchOnWindowFocus;
+
+  /// Whether to refetch when the app comes to foreground
+  final bool refetchOnAppFocus;
+
+  /// Whether to pause automatic refetching when app is in background
+  final bool pauseRefetchInBackground;
 
   /// Interval for automatic refetching (null to disable)
   final Duration? refetchInterval;
@@ -55,6 +63,8 @@ class QueryOptions<T> {
     Duration? cacheTime,
     bool? refetchOnMount,
     bool? refetchOnWindowFocus,
+    bool? refetchOnAppFocus,
+    bool? pauseRefetchInBackground,
     Duration? refetchInterval,
     int? retry,
     Duration? retryDelay,
@@ -68,6 +78,8 @@ class QueryOptions<T> {
       cacheTime: cacheTime ?? this.cacheTime,
       refetchOnMount: refetchOnMount ?? this.refetchOnMount,
       refetchOnWindowFocus: refetchOnWindowFocus ?? this.refetchOnWindowFocus,
+      refetchOnAppFocus: refetchOnAppFocus ?? this.refetchOnAppFocus,
+      pauseRefetchInBackground: pauseRefetchInBackground ?? this.pauseRefetchInBackground,
       refetchInterval: refetchInterval ?? this.refetchInterval,
       retry: retry ?? this.retry,
       retryDelay: retryDelay ?? this.retryDelay,
@@ -86,6 +98,8 @@ class QueryOptions<T> {
           other.cacheTime == cacheTime &&
           other.refetchOnMount == refetchOnMount &&
           other.refetchOnWindowFocus == refetchOnWindowFocus &&
+          other.refetchOnAppFocus == refetchOnAppFocus &&
+          other.pauseRefetchInBackground == pauseRefetchInBackground &&
           other.refetchInterval == refetchInterval &&
           other.retry == retry &&
           other.retryDelay == retryDelay &&
@@ -98,6 +112,8 @@ class QueryOptions<T> {
         cacheTime,
         refetchOnMount,
         refetchOnWindowFocus,
+        refetchOnAppFocus,
+        pauseRefetchInBackground,
         refetchInterval,
         retry,
         retryDelay,
@@ -150,6 +166,8 @@ class InfiniteQueryOptions<T, TPageParam> extends QueryOptions<T> {
     Duration? cacheTime,
     bool? refetchOnMount,
     bool? refetchOnWindowFocus,
+    bool? refetchOnAppFocus,
+    bool? pauseRefetchInBackground,
     Duration? refetchInterval,
     int? retry,
     Duration? retryDelay,

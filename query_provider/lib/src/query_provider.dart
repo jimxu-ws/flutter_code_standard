@@ -5,6 +5,9 @@ import 'package:meta/meta.dart';
 import 'query_state.dart';
 import 'query_options.dart';
 import 'query_client.dart';
+import 'query_cache.dart';
+import 'app_lifecycle_manager.dart';
+import 'window_focus_manager.dart';
 
 /// A function that fetches data for a query
 typedef QueryFunction<T> = Future<T> Function();
@@ -12,41 +15,7 @@ typedef QueryFunction<T> = Future<T> Function();
 /// A function that fetches data with parameters
 typedef QueryFunctionWithParams<T, P> = Future<T> Function(P params);
 
-/// Cache entry for storing query data and metadata
-@immutable
-class QueryCacheEntry<T> {
-  const QueryCacheEntry({
-    required this.data,
-    required this.fetchedAt,
-    required this.options,
-  });
-
-  final T data;
-  final DateTime fetchedAt;
-  final QueryOptions<T> options;
-
-  bool get isStale {
-    final now = DateTime.now();
-    return now.difference(fetchedAt) > options.staleTime;
-  }
-
-  bool get shouldEvict {
-    final now = DateTime.now();
-    return now.difference(fetchedAt) > options.cacheTime;
-  }
-
-  QueryCacheEntry<T> copyWith({
-    T? data,
-    DateTime? fetchedAt,
-    QueryOptions<T>? options,
-  }) {
-    return QueryCacheEntry<T>(
-      data: data ?? this.data,
-      fetchedAt: fetchedAt ?? this.fetchedAt,
-      options: options ?? this.options,
-    );
-  }
-}
+// QueryCacheEntry is now defined in query_cache.dart
 
 /// Notifier for managing query state
 class QueryNotifier<T> extends StateNotifier<QueryState<T>>
@@ -66,8 +35,21 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
 
   Timer? _refetchTimer;
   int _retryCount = 0;
+  late final QueryCache _cache;
+  late final AppLifecycleManager _lifecycleManager;
+  late final WindowFocusManager _windowFocusManager;
+  bool _isRefetchPaused = false;
 
   void _initialize() {
+    // Initialize cache, lifecycle manager, and window focus manager
+    _cache = getGlobalQueryCache();
+    _lifecycleManager = AppLifecycleManager.instance;
+    _windowFocusManager = WindowFocusManager.instance;
+    
+    // Set up lifecycle and window focus callbacks
+    _setupLifecycleCallbacks();
+    _setupWindowFocusCallbacks();
+    
     if (options.enabled && options.refetchOnMount) {
       _fetch();
     }
@@ -84,8 +66,8 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
 
     // Check cache first
     final cachedEntry = _getCachedEntry();
-    if (cachedEntry != null && !cachedEntry.isStale) {
-      state = QuerySuccess(cachedEntry.data, fetchedAt: cachedEntry.fetchedAt);
+    if (cachedEntry != null && !cachedEntry.isStale && cachedEntry.hasData) {
+      state = QuerySuccess(cachedEntry.data as T, fetchedAt: cachedEntry.fetchedAt);
       return;
     }
 
@@ -101,7 +83,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
       final now = DateTime.now();
       
       // Cache the result
-      _setCachedEntry(QueryCacheEntry(
+      _setCachedEntry(QueryCacheEntry<T>(
         data: data,
         fetchedAt: now,
         options: options,
@@ -118,6 +100,14 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
         await Future.delayed(options.retryDelay);
         return _fetch();
       }
+
+      // Cache the error
+      _cache.setError<T>(
+        queryKey,
+        error,
+        stackTrace: stackTrace,
+        options: options,
+      );
 
       state = QueryError(error, stackTrace: stackTrace);
       _retryCount = 0;
@@ -136,34 +126,122 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
     return _fetch();
   }
 
+  /// Set query data manually (for optimistic updates)
+  void setData(T data) {
+    final now = DateTime.now();
+    _setCachedEntry(QueryCacheEntry<T>(
+      data: data,
+      fetchedAt: now,
+      options: options,
+    ));
+    state = QuerySuccess(data, fetchedAt: now);
+  }
+
+  /// Get current cached data
+  T? getCachedData() {
+    final entry = _getCachedEntry();
+    return entry?.hasData == true ? entry!.data as T : null;
+  }
+
   void _scheduleRefetch() {
     _refetchTimer?.cancel();
     if (options.refetchInterval != null) {
       _refetchTimer = Timer.periodic(options.refetchInterval!, (_) {
-        if (options.enabled) {
+        if (options.enabled && _shouldRefetch()) {
           _fetch();
         }
       });
     }
   }
 
+  /// Check if refetch should proceed based on app state
+  bool _shouldRefetch() {
+    // If refetching is explicitly paused, don't refetch
+    if (_isRefetchPaused) {
+      return false;
+    }
+    
+    // If pausing in background is enabled and app is in background, don't refetch
+    if (options.pauseRefetchInBackground && _lifecycleManager.isInBackground) {
+      return false;
+    }
+    
+    return true;
+  }
+
+  /// Set up app lifecycle callbacks
+  void _setupLifecycleCallbacks() {
+    // Refetch when app comes to foreground (if enabled and data is stale)
+    if (options.refetchOnAppFocus) {
+      _lifecycleManager.addOnResumeCallback(_onAppResume);
+    }
+    
+    // Pause refetching when app goes to background (if enabled)
+    if (options.pauseRefetchInBackground) {
+      _lifecycleManager.addOnPauseCallback(_onAppPause);
+    }
+  }
+
+  void _onAppResume() {
+    // Resume refetching and check if we need to refetch stale data
+    _isRefetchPaused = false;
+    
+    final cachedEntry = _getCachedEntry();
+    if (cachedEntry != null && cachedEntry.isStale && options.enabled) {
+      _fetch();
+    }
+  }
+
+  void _onAppPause() {
+    // Mark refetching as paused
+    _isRefetchPaused = true;
+  }
+
+  /// Set up window focus callbacks
+  void _setupWindowFocusCallbacks() {
+    // Refetch when window gains focus (if enabled and data is stale)
+    if (options.refetchOnWindowFocus && _windowFocusManager.isSupported) {
+      _windowFocusManager.addOnFocusCallback(_onWindowFocus);
+    }
+  }
+
+  void _onWindowFocus() {
+    // Refetch stale data when window gains focus
+    final cachedEntry = _getCachedEntry();
+    if (cachedEntry != null && cachedEntry.isStale && options.enabled) {
+      _fetch();
+    }
+  }
+
   QueryCacheEntry<T>? _getCachedEntry() {
-    // In a real implementation, this would use a global cache
-    // For now, we'll use a simple in-memory approach
-    return null;
+    return _cache.get<T>(queryKey);
   }
 
   void _setCachedEntry(QueryCacheEntry<T> entry) {
-    // In a real implementation, this would store in a global cache
+    _cache.set(queryKey, entry);
   }
 
   void _clearCache() {
-    // In a real implementation, this would clear from global cache
+    _cache.remove(queryKey);
   }
 
   @override
   void dispose() {
     _refetchTimer?.cancel();
+    
+    // Clean up lifecycle callbacks
+    if (options.refetchOnAppFocus) {
+      _lifecycleManager.removeOnResumeCallback(_onAppResume);
+    }
+    if (options.pauseRefetchInBackground) {
+      _lifecycleManager.removeOnPauseCallback(_onAppPause);
+    }
+    
+    // Clean up window focus callbacks
+    if (options.refetchOnWindowFocus && _windowFocusManager.isSupported) {
+      _windowFocusManager.removeOnFocusCallback(_onWindowFocus);
+    }
+    
     super.dispose();
   }
 }
