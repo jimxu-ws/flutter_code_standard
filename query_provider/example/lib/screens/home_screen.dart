@@ -8,6 +8,8 @@ import '../models/user.dart';
 import '../models/post.dart';
 import 'user_detail_screen.dart';
 import 'posts_screen.dart';
+import 'user_search_screen.dart';
+import 'provider_comparison_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -15,7 +17,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Query Provider Example'),
@@ -23,6 +25,7 @@ class HomeScreen extends ConsumerWidget {
             tabs: [
               Tab(text: 'Users', icon: Icon(Icons.people)),
               Tab(text: 'Posts', icon: Icon(Icons.article)),
+              Tab(text: 'Search', icon: Icon(Icons.search)),
               Tab(text: 'Mutations', icon: Icon(Icons.edit)),
             ],
           ),
@@ -31,6 +34,7 @@ class HomeScreen extends ConsumerWidget {
           children: [
             UsersTab(),
             PostsTab(),
+            SearchTab(),
             MutationsTab(),
           ],
         ),
@@ -53,12 +57,39 @@ class UsersTab extends ConsumerWidget {
         onRefresh: () async {
           await ref.read(usersQueryProvider.notifier).refetch();
         },
-        child: ListView.builder(
-          itemCount: users.length,
-          itemBuilder: (context, index) {
-            final user = users[index];
-            return UserListTile(user: user);
-          },
+        child: Column(
+          children: [
+            // Comparison button
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16.0),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProviderComparisonScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.compare_arrows),
+                label: const Text('Compare Provider Approaches'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.all(16),
+                ),
+              ),
+            ),
+            // Users list
+            Expanded(
+              child: ListView.builder(
+                itemCount: users.length,
+                itemBuilder: (context, index) {
+                  final user = users[index];
+                  return UserListTile(user: user);
+                },
+              ),
+            ),
+          ],
         ),
       ),
       error: (error, stackTrace) => Center(
@@ -145,6 +176,15 @@ class PostsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return const PostsScreen();
+  }
+}
+
+class SearchTab extends ConsumerWidget {
+  const SearchTab({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return const UserSearchScreen();
   }
 }
 

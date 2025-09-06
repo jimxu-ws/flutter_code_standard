@@ -14,11 +14,44 @@ final usersQueryProvider = queryProvider<List<User>>(
   ),
 );
 
-/// Query provider for fetching a single user by ID
+/// Query provider for fetching a single user by ID (using function approach)
 StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userQueryProvider(int userId) {
   return queryProvider<User>(
     name: 'user-$userId',
     queryFn: () => ApiService.fetchUser(userId),
+    options: const QueryOptions<User>(
+      staleTime: Duration(minutes: 3),
+      cacheTime: Duration(minutes: 15),
+    ),
+  );
+}
+
+/// Query provider family for fetching users by ID (recommended approach)
+final userQueryProviderFamily = queryProviderFamily<User, int>(
+  name: 'user',
+  queryFn: ApiService.fetchUser,
+  options: const QueryOptions<User>(
+    staleTime: Duration(minutes: 3),
+    cacheTime: Duration(minutes: 15),
+  ),
+);
+
+/// Query provider family for searching users by name
+final userSearchProviderFamily = queryProviderFamily<List<User>, String>(
+  name: 'userSearch',
+  queryFn: ApiService.searchUsers,
+  options: const QueryOptions<List<User>>(
+    staleTime: Duration(seconds: 30), // Search results get stale quickly
+    cacheTime: Duration(minutes: 5),
+  ),
+);
+
+/// Alternative: Using queryProviderWithParams (with fixed parameters)
+StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userQueryWithParams(int userId) {
+  return queryProviderWithParams<User, int>(
+    name: 'user',
+    params: userId,
+    queryFn: ApiService.fetchUser,
     options: const QueryOptions<User>(
       staleTime: Duration(minutes: 3),
       cacheTime: Duration(minutes: 15),

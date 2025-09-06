@@ -60,8 +60,8 @@ Future<List<User>> fetchUsers() async {
   return data.map((json) => User.fromJson(json)).toList();
 }
 
-// Create a query provider
-final usersQueryProvider = QueryProvider<List<User>>(
+// Create a simple query provider
+final usersQueryProvider = queryProvider<List<User>>(
   name: 'users',
   queryFn: fetchUsers,
   options: const QueryOptions<List<User>>(
@@ -69,6 +69,52 @@ final usersQueryProvider = QueryProvider<List<User>>(
     cacheTime: Duration(minutes: 10),
   ),
 );
+```
+
+### 2.1. Parameterized Queries
+
+For queries that depend on parameters, you have several options:
+
+```dart
+// Option 1: Function-based approach (simple)
+StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userProvider(int userId) {
+  return queryProvider<User>(
+    name: 'user-$userId',
+    queryFn: () => fetchUser(userId),
+  );
+}
+
+// Option 2: Provider Family (recommended for dynamic parameters)
+final userProviderFamily = queryProviderFamily<User, int>(
+  name: 'user',
+  queryFn: fetchUser, // fetchUser(int userId) function
+);
+
+// Option 3: Fixed parameters approach
+StateNotifierProvider<QueryNotifier<User>, QueryState<User>> specificUserProvider() {
+  return queryProviderWithParams<User, int>(
+    name: 'user',
+    params: 123, // Fixed user ID
+    queryFn: fetchUser,
+  );
+}
+
+// Usage in widgets:
+class UserWidget extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Using Option 1
+    final userState1 = ref.watch(userProvider(123));
+    
+    // Using Option 2 (Provider Family)
+    final userState2 = ref.watch(userProviderFamily(123));
+    
+    // Using Option 3
+    final userState3 = ref.watch(specificUserProvider());
+    
+    return userState1.when(/* ... */);
+  }
+}
 ```
 
 ### 3. Use the Query in Your Widget

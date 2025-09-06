@@ -9,3 +9,6 @@ export 'src/query_client.dart';
 export 'src/query_options.dart';
 export 'src/mutation_options.dart';
 export 'src/extensions/query_extensions.dart';
+
+// Re-export Riverpod types for convenience
+export 'package:flutter_riverpod/flutter_riverpod.dart' show StateNotifierProviderFamily;

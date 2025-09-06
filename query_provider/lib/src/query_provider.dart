@@ -185,18 +185,38 @@ StateNotifierProvider<QueryNotifier<T>, QueryState<T>> queryProvider<T>({
   );
 }
 
-/// Provider for creating queries with parameters
-Provider<QueryState<T>> queryProviderWithParams<T, P>({
+/// Provider family for creating queries with parameters
+StateNotifierProviderFamily<QueryNotifier<T>, QueryState<T>, P> queryProviderFamily<T, P>({
   required String name,
   required QueryFunctionWithParams<T, P> queryFn,
   QueryOptions<T> options = const QueryOptions(),
 }) {
-  return Provider<QueryState<T>>(
-    (ref) {
-      // This is a simplified version - in practice you'd want to handle parameters
-      throw UnimplementedError('Parameter-based queries need parameter handling');
-    },
+  return StateNotifierProvider.family<QueryNotifier<T>, QueryState<T>, P>(
+    (ref, param) => QueryNotifier<T>(
+      queryFn: () => queryFn(param),
+      options: options,
+      queryKey: '$name-$param',
+      ref: ref,
+    ),
     name: name,
+  );
+}
+
+/// Convenience function for creating parameterized queries with constant parameters
+StateNotifierProvider<QueryNotifier<T>, QueryState<T>> queryProviderWithParams<T, P>({
+  required String name,
+  required P params, // Should be const for best practices
+  required QueryFunctionWithParams<T, P> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) {
+  return StateNotifierProvider<QueryNotifier<T>, QueryState<T>>(
+    (ref) => QueryNotifier<T>(
+      queryFn: () => queryFn(params),
+      options: options,
+      queryKey: '$name-$params',
+      ref: ref,
+    ),
+    name: '$name-$params',
   );
 }
 

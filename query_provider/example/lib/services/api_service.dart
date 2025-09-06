@@ -54,6 +54,27 @@ class ApiService {
     );
   }
 
+  /// Search users by name
+  static Future<List<User>> searchUsers(String query) async {
+    await _delay();
+    _maybeThrow();
+
+    if (query.isEmpty) {
+      return [];
+    }
+
+    // Simulate search results
+    return List.generate(5, (index) {
+      final userId = query.hashCode.abs() % 1000 + index;
+      return User(
+        id: userId,
+        name: 'User matching "$query" #${index + 1}',
+        email: 'user$userId@example.com',
+        avatar: 'https://i.pravatar.cc/150?img=$userId',
+      );
+    });
+  }
+
   /// Create a new user
   static Future<User> createUser(Map<String, dynamic> userData) async {
     await _delay();

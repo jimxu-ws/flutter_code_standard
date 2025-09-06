@@ -14,7 +14,8 @@ class UserDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userState = ref.watch(userQueryProvider(userId));
+    // Using family provider (recommended approach)
+    final userState = ref.watch(userQueryProviderFamily(userId));
     final userPostsState = ref.watch(userPostsQueryProvider(userId));
 
     return Scaffold(
@@ -24,7 +25,7 @@ class UserDetailScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              ref.read(userQueryProvider(userId).notifier).refetch();
+              ref.read(userQueryProviderFamily(userId).notifier).refetch();
               ref.read(userPostsQueryProvider(userId).notifier).refetch();
             },
           ),
@@ -42,7 +43,7 @@ class UserDetailScreen extends ConsumerWidget {
               success: (user) => UserInfoCard(user: user),
               error: (error, stackTrace) => ErrorCard(
                 error: error,
-                onRetry: () => ref.read(userQueryProvider(userId).notifier).refetch(),
+                onRetry: () => ref.read(userQueryProviderFamily(userId).notifier).refetch(),
               ),
               refetching: (user) => Stack(
                 children: [
