@@ -43,7 +43,7 @@ class MutationNotifier<TData, TVariables> extends StateNotifier<MutationState<TD
     } catch (error, stackTrace) {
       if (_retryCount < options.retry) {
         _retryCount++;
-        await Future.delayed(options.retryDelay);
+        await Future<void>.delayed(options.retryDelay);
         return mutate(variables);
       }
 
@@ -69,8 +69,7 @@ StateNotifierProvider<MutationNotifier<TData, TVariables>, MutationState<TData>>
   required String name,
   required MutationFunction<TData, TVariables> mutationFn,
   MutationOptions<TData, TVariables> options = const MutationOptions(),
-}) {
-  return StateNotifierProvider<MutationNotifier<TData, TVariables>, MutationState<TData>>(
+}) => StateNotifierProvider<MutationNotifier<TData, TVariables>, MutationState<TData>>(
     (ref) => MutationNotifier<TData, TVariables>(
       mutationFn: mutationFn,
       options: options,
@@ -78,7 +77,6 @@ StateNotifierProvider<MutationNotifier<TData, TVariables>, MutationState<TData>>
     ),
     name: name,
   );
-}
 
 /// Hook-like interface for using mutations
 @immutable
@@ -135,22 +133,19 @@ extension MutationStateExtensions<T> on MutationState<T> {
     R Function()? loading,
     R Function(T data)? success,
     R Function(Object error, StackTrace? stackTrace)? error,
-  }) {
-    return switch (this) {
+  })=>switch (this) {
       MutationIdle<T>() => idle?.call(),
       MutationLoading<T>() => loading?.call(),
       MutationSuccess<T> successState => success?.call(successState.data),
       MutationError<T> errorState => error?.call(errorState.error, errorState.stackTrace),
     };
-  }
+  
 
   /// Map the data if the mutation is successful
-  MutationState<R> map<R>(R Function(T data) mapper) {
-    return switch (this) {
+  MutationState<R> map<R>(R Function(T data) mapper) =>switch (this) {
       MutationSuccess<T> success => MutationSuccess(mapper(success.data)),
       MutationIdle<T>() => MutationIdle<R>(),
       MutationLoading<T>() => MutationLoading<R>(),
       MutationError<T> error => MutationError<R>(error.error, stackTrace: error.stackTrace),
     };
-  }
 }

@@ -53,7 +53,7 @@ linter:
     - always_declare_return_types
     - always_put_control_body_on_new_line
     - always_put_required_named_parameters_first
-    - always_specify_types
+    # - always_specify_types
     - annotate_overrides
     - avoid_annotating_with_dynamic
     - avoid_bool_literals_in_conditional_expressions
@@ -98,13 +98,13 @@ linter:
     - leading_newlines_in_multiline_strings
     - library_names
     - library_prefixes
-    - lines_longer_than_80_chars
+    # - lines_longer_than_80_chars
     - missing_whitespace_between_adjacent_strings
     - no_default_cases
     - no_runtimeType_toString
     - non_constant_identifier_names
     - null_closures
-    - omit_local_variable_types
+    # - omit_local_variable_types
     - one_member_abstracts
     - only_throw_errors
     - overridden_fields

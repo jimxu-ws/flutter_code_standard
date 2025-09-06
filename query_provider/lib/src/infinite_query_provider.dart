@@ -33,15 +33,15 @@ sealed class InfiniteQueryState<T> {
 
   /// Returns the pages if available
   List<T>? get pages => switch (this) {
-        InfiniteQuerySuccess<T> success => success.pages,
-        InfiniteQueryFetchingNextPage<T> fetching => fetching.pages,
-        InfiniteQueryFetchingPreviousPage<T> fetching => fetching.pages,
+        final InfiniteQuerySuccess<T> success => success.pages,
+        final InfiniteQueryFetchingNextPage<T> fetching => fetching.pages,
+        final InfiniteQueryFetchingPreviousPage<T> fetching => fetching.pages,
         _ => null,
       };
 
   /// Returns the error if available
   Object? get error => switch (this) {
-        InfiniteQueryError<T> error => error.error,
+        final InfiniteQueryError<T> error => error.error,
         _ => null,
       };
 }
@@ -114,14 +114,12 @@ final class InfiniteQuerySuccess<T> extends InfiniteQueryState<T> {
     bool? hasNextPage,
     bool? hasPreviousPage,
     DateTime? fetchedAt,
-  }) {
-    return InfiniteQuerySuccess<T>(
+  }) => InfiniteQuerySuccess<T>(
       pages: pages ?? this.pages,
       hasNextPage: hasNextPage ?? this.hasNextPage,
       hasPreviousPage: hasPreviousPage ?? this.hasPreviousPage,
       fetchedAt: fetchedAt ?? this.fetchedAt,
     );
-  }
 }
 
 /// State when query has failed with an error
@@ -285,7 +283,9 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
       currentState.pages,
     );
 
-    if (nextPageParam == null) return;
+    if (nextPageParam == null) {
+      return;
+    }
 
     state = InfiniteQueryFetchingNextPage<T>(
       pages: currentState.pages,
@@ -425,8 +425,7 @@ StateNotifierProvider<InfiniteQueryNotifier<T, TPageParam>, InfiniteQueryState<T
   required InfiniteQueryFunction<T, TPageParam> queryFn,
   required TPageParam initialPageParam,
   required InfiniteQueryOptions<T, TPageParam> options,
-}) {
-  return StateNotifierProvider<InfiniteQueryNotifier<T, TPageParam>, InfiniteQueryState<T>>(
+}) => StateNotifierProvider<InfiniteQueryNotifier<T, TPageParam>, InfiniteQueryState<T>>(
     (ref) => InfiniteQueryNotifier<T, TPageParam>(
       queryFn: queryFn,
       options: options,
@@ -436,7 +435,6 @@ StateNotifierProvider<InfiniteQueryNotifier<T, TPageParam>, InfiniteQueryState<T
     ),
     name: name,
   );
-}
 
 /// Hook-like interface for using infinite queries
 @immutable
@@ -476,9 +474,9 @@ class InfiniteQueryResult<T> {
 
   /// Returns true if there are more pages to fetch
   bool get hasNextPage => switch (state) {
-        InfiniteQuerySuccess<T> success => success.hasNextPage,
-        InfiniteQueryFetchingNextPage<T> fetching => fetching.hasNextPage,
-        InfiniteQueryFetchingPreviousPage<T> fetching => fetching.hasNextPage,
+        final InfiniteQuerySuccess<T> success => success.hasNextPage,
+        final InfiniteQueryFetchingNextPage<T> fetching => fetching.hasNextPage,
+        final InfiniteQueryFetchingPreviousPage<T> fetching => fetching.hasNextPage,
         _ => false,
       };
 
