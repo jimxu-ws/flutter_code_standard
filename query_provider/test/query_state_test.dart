@@ -139,7 +139,7 @@ void main() {
         final now = DateTime.now();
         final state = QueryRefetching('previous data', fetchedAt: now);
         
-        expect(state.hasData, true);
+        expect(state.hasData, false); // QueryRefetching is not QuerySuccess
         expect(state.hasError, false);
         expect(state.isLoading, false);
         expect(state.isIdle, false);

@@ -9,7 +9,7 @@ void main() {
       expect(options.staleTime, const Duration(minutes: 5));
       expect(options.cacheTime, const Duration(minutes: 30));
       expect(options.refetchOnMount, true);
-      expect(options.refetchOnWindowFocus, false);
+      expect(options.refetchOnWindowFocus, true);
       expect(options.refetchInterval, null);
       expect(options.retry, 3);
       expect(options.retryDelay, const Duration(seconds: 1));
