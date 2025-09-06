@@ -1,0 +1,11 @@
+/// A React Query-like data fetching library for Flutter using Riverpod
+library query_provider;
+
+export 'src/query_state.dart';
+export 'src/query_provider.dart';
+export 'src/mutation_provider.dart';
+export 'src/infinite_query_provider.dart';
+export 'src/query_client.dart';
+export 'src/query_options.dart';
+export 'src/mutation_options.dart';
+export 'src/extensions/query_extensions.dart';
