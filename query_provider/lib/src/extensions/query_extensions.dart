@@ -31,9 +31,7 @@ extension QueryWidgetRefExtension on WidgetRef {
 extension QueryConsumerExtension on Consumer {
   /// Create a consumer that watches a query
   static Widget query<T>({
-    Key? key,
-    required StateNotifierProvider<QueryNotifier<T>, QueryState<T>> provider,
-    required Widget Function(BuildContext context, QueryState<T> state, Widget? child) builder,
+    required StateNotifierProvider<QueryNotifier<T>, QueryState<T>> provider, required Widget Function(BuildContext context, QueryState<T> state, Widget? child) builder, Key? key,
     Widget? child,
   }) => Consumer(
       key: key,

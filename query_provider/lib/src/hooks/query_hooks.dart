@@ -216,6 +216,7 @@ class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQuery
   T? _data;
   Object? _error;
   bool _isLoading = false;
+  bool _disposed = false;
 
   @override
   void initHook() {
@@ -234,26 +235,32 @@ class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQuery
   }
 
   void _setupFetcher() {
-    _fetcher = (hook.ref as Ref).cachedFetcher<T>(
+    _fetcher = hook.ref.cachedFetcher<T>(
       fetchFn: hook.fetchFn,
       onData: (data) {
-        setState(() {
-          _data = data;
-          _error = null;
-          _isLoading = false;
-        });
+        if (!_disposed) {
+          setState(() {
+            _data = data;
+            _error = null;
+            _isLoading = false;
+          });
+        }
       },
       onLoading: () {
-        setState(() {
-          _isLoading = true;
-          _error = null;
-        });
+        if (!_disposed) {
+          setState(() {
+            _isLoading = true;
+            _error = null;
+          });
+        }
       },
       onError: (error) {
-        setState(() {
-          _error = error;
-          _isLoading = false;
-        });
+        if (!_disposed) {
+          setState(() {
+            _error = error;
+            _isLoading = false;
+          });
+        }
       },
       cacheKey: hook.cacheKey,
       staleTime: hook.staleTime,
@@ -266,7 +273,9 @@ class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQuery
     // Auto-fetch if enabled
     if (hook.enabled) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _fetcher.fetch();
+        if (!_disposed) {
+          _fetcher.fetch();
+        }
       });
     }
   }
@@ -288,7 +297,10 @@ class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQuery
 
   @override
   void dispose() {
-    // Cleanup if needed
+    // Mark as disposed to prevent any future setState calls
+    _disposed = true;
+    // Clear any pending operations to prevent setState calls after dispose
+    _fetcher.clearCache();
     super.dispose();
   }
 }

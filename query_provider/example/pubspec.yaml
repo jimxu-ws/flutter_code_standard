@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_riverpod: ^2.4.9
+  hooks_riverpod: ^2.6.1
   query_provider:
     path: ../
 

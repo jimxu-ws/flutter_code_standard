@@ -14,6 +14,7 @@ import 'riverpod_annotated_demo_screen.dart';
 import 'smart_payroll_demo.dart';
 import 'payroll_hooks_example.dart';
 import 'hooks_comparison.dart';
+import 'smart_cache_examples.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,7 +22,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 9,
+      length: 10,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Query Provider Example'),
@@ -49,6 +50,7 @@ class HomeScreen extends ConsumerWidget {
               Tab(text: 'Utils示例', icon: Icon(Icons.extension)),
               Tab(text: '@riverpod示例', icon: Icon(Icons.code)),
               Tab(text: 'Smart Cache', icon: Icon(Icons.rocket_launch)),
+              Tab(text: 'Cache示例', icon: Icon(Icons.memory)),
               Tab(text: 'Hooks示例', icon: Icon(Icons.interests)),
               Tab(text: 'Hooks对比', icon: Icon(Icons.compare_arrows)),
             ],
@@ -63,6 +65,7 @@ class HomeScreen extends ConsumerWidget {
             AnnotatedExampleScreen(),
             RiverpodAnnotatedDemoScreen(),
             SmartPayrollDemo(),
+            SmartCacheComparisonScreen(),
             PayrollHooksExample(),
             HooksComparison(),
           ],

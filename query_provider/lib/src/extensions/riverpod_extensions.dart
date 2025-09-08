@@ -88,54 +88,6 @@ class QueryUtils {
       cacheErrors: cacheErrors,
     );
   }
-
-  /// Create a state-aware cached data fetcher that can automatically update state
-  /// 
-  /// This is a more advanced version that can directly manage state updates
-  /// 
-  /// Example:
-  /// ```dart
-  /// @riverpod
-  /// class PayrollCheck extends _$PayrollCheck {
-  ///   late final _payrollFetcher = QueryUtils.statefulCachedFetcher<Result<GetPayrollResponse>, PayrollCheckModel>(
-  ///     ref: ref,
-  ///     fetchFn: () => ref.read(apiClientProvider).getPayroll(),
-  ///     getState: () => state,
-  ///     setState: (newState) => state = newState,
-  ///     onData: (data, currentState) => currentState.copyWith(checkPayrollResult: data, employeesList: data.response?.employees),
-  ///     onLoading: (currentState) => currentState.copyWith(checkPayrollResult: Result.pending()),
-  ///     onError: (error, currentState) => currentState.copyWith(checkPayrollResult: Result.fail()),
-  ///   );
-  /// 
-  ///   Future<void> getPayroll() => _payrollFetcher.fetch();
-  ///   Future<void> refreshPayroll() => _payrollFetcher.refresh();
-  /// }
-  /// ```
-  static StatefulCachedDataFetcher<T, S> statefulCachedFetcher<T, S>({
-    required Ref ref,
-    required Future<T> Function() fetchFn,
-    required S Function() getState,
-    required void Function(S state) setState,
-    required S Function(T data, S currentState) onData,
-    required S Function(S currentState) onLoading,
-    required S Function(Object error, S currentState) onError,
-    String? cacheKey,
-    Duration? cacheDuration,
-    bool cacheErrors = false,
-  }) {
-    return StatefulCachedDataFetcher<T, S>(
-      ref: ref,
-      fetchFn: fetchFn,
-      getState: getState,
-      setState: setState,
-      onData: onData,
-      onLoading: onLoading,
-      onError: onError,
-      cacheKey: cacheKey,
-      cacheDuration: cacheDuration,
-      cacheErrors: cacheErrors,
-    );
-  }
 }
 
 /// Generic cached data fetcher with automatic cache key generation and lifecycle management
@@ -162,65 +114,6 @@ class CachedDataFetcher<T> {
     final typeString = T.toString();
     final functionHash = fetchFn.hashCode.toString();
     return 'cached-data-$typeString-$functionHash';
-  }
-
-  /// Get data with automatic caching and callback-based state updates
-  /// 
-  /// This method combines getCached() and getData() functionality:
-  /// - If cached data exists and not forcing refresh, calls onData immediately with cached data
-  /// - If no cache or forcing refresh, calls onLoading (if provided), fetches data, then calls onData
-  /// - If error occurs, calls onError (if provided)
-  /// 
-  /// [forceRefresh] - if true, bypasses cache and fetches fresh data
-  /// [updateCache] - if false, doesn't update cache with new data
-  /// [onData] - called with data (from cache or fresh fetch)
-  /// [onLoading] - called when starting to fetch (optional)
-  /// [onError] - called when fetch fails (optional)
-  Future<void> getDataWithCallbacks({
-    bool forceRefresh = false,
-    bool updateCache = true,
-    required void Function(T data) onData,
-    void Function()? onLoading,
-    void Function(Object error)? onError,
-  }) async {
-    final queryClient = ref.queryClient;
-
-    // Check cache first (unless force refresh)
-    if (!forceRefresh) {
-      final cached = queryClient.getQueryData<T>(cacheKey);
-      if (cached != null) {
-        onData(cached);
-        return;
-      }
-    }
-
-    try {
-      // Call loading callback if provided
-      onLoading?.call();
-      
-      // Fetch fresh data
-      final result = await fetchFn();
-      
-      // Cache the successful result
-      if (updateCache) {
-        queryClient.setQueryData<T>(cacheKey, result);
-      }
-      
-      // Call success callback
-      onData(result);
-    } catch (error) {
-      // Optionally cache errors to prevent repeated failed requests
-      if (cacheErrors && updateCache) {
-        queryClient.setQueryData<T?>(cacheKey, null);
-      }
-      
-      // Call error callback if provided, otherwise rethrow
-      if (onError != null) {
-        onError(error);
-      } else {
-        rethrow;
-      }
-    }
   }
 
   /// Get data with automatic caching and staleness checks (original method for backward compatibility)
@@ -261,21 +154,6 @@ class CachedDataFetcher<T> {
     }
   }
 
-  /// Refresh data with callbacks (invalidate cache and fetch new)
-  Future<void> refreshWithCallbacks({
-    required void Function(T data) onData,
-    void Function()? onLoading,
-    void Function(Object error)? onError,
-  }) async {
-    ref.invalidateQueries(cacheKey);
-    return getDataWithCallbacks(
-      forceRefresh: true,
-      onData: onData,
-      onLoading: onLoading,
-      onError: onError,
-    );
-  }
-
   /// Refresh data (invalidate cache and fetch new) - returns the fresh data
   Future<T> refresh() async {
     ref.invalidateQueries(cacheKey);
@@ -299,98 +177,6 @@ class CachedDataFetcher<T> {
   /// This is an alias for getData() with default parameters
   Future<T> getOrFetch() => getData();
 
-  /// Execute a callback with cached data if available, otherwise fetch first
-  /// Useful for conditional operations
-  Future<R> withData<R>(Future<R> Function(T data) callback) async {
-    final data = await getOrFetch();
-    return callback(data);
-  }
-
-  /// Execute a callback only if data is cached (doesn't trigger fetch)
-  /// Returns null if data is not cached
-  R? withCachedData<R>(R Function(T data) callback) {
-    final cached = getCached();
-    return cached != null ? callback(cached) : null;
-  }
-}
-
-/// State-aware cached data fetcher that can automatically manage state updates
-/// 
-/// This advanced version eliminates the need for manual state management
-/// by providing declarative state transformation functions.
-class StatefulCachedDataFetcher<T, S> {
-  final CachedDataFetcher<T> _fetcher;
-  final S Function() getState;
-  final void Function(S state) setState;
-  final S Function(T data, S currentState) onData;
-  final S Function(S currentState) onLoading;
-  final S Function(Object error, S currentState) onError;
-
-  StatefulCachedDataFetcher({
-    required Ref ref,
-    required Future<T> Function() fetchFn,
-    required this.getState,
-    required this.setState,
-    required this.onData,
-    required this.onLoading,
-    required this.onError,
-    String? cacheKey,
-    Duration? cacheDuration,
-    bool cacheErrors = false,
-  }) : _fetcher = CachedDataFetcher<T>(
-          ref: ref,
-          fetchFn: fetchFn,
-          cacheKey: cacheKey,
-          cacheDuration: cacheDuration,
-          cacheErrors: cacheErrors,
-        );
-
-  /// Fetch data with automatic state management
-  Future<void> fetch({bool forceRefresh = false}) async {
-    await _fetcher.getDataWithCallbacks(
-      forceRefresh: forceRefresh,
-      onData: (data) {
-        final currentState = getState();
-        final newState = onData(data, currentState);
-        setState(newState);
-      },
-      onLoading: () {
-        final currentState = getState();
-        final newState = onLoading(currentState);
-        setState(newState);
-      },
-      onError: (error) {
-        final currentState = getState();
-        final newState = onError(error, currentState);
-        setState(newState);
-      },
-    );
-  }
-
-  /// Refresh data with automatic state management
-  Future<void> refresh() async {
-    await fetch(forceRefresh: true);
-  }
-
-  /// Clear cache and optionally reset state
-  void clearCache({S? resetState}) {
-    _fetcher.clearCache();
-    if (resetState != null) {
-      setState(resetState);
-    }
-  }
-
-  /// Get cached data without triggering fetch
-  T? getCached() => _fetcher.getCached();
-
-  /// Check if data is cached
-  bool get isCached => _fetcher.isCached;
-
-  /// Get cache key
-  String get cacheKey => _fetcher.cacheKey;
-
-  /// Access the underlying fetcher for advanced operations
-  CachedDataFetcher<T> get fetcher => _fetcher;
 }
 
 /// Smart cached data fetcher with stale-while-revalidate strategy
@@ -402,7 +188,7 @@ class StatefulCachedDataFetcher<T, S> {
 /// - Supports window focus and background refresh
 /// - Handles lifecycle events automatically
 class SmartCachedFetcher<T> {
-  final Ref ref;
+  final dynamic ref; // Accept both Ref and WidgetRef
   final String cacheKey;
   final Future<T> Function() fetchFn;
   final void Function(T data) onData;
@@ -416,6 +202,27 @@ class SmartCachedFetcher<T> {
 
   DateTime? _lastFetchTime;
   bool _isCurrentlyFetching = false;
+  
+  /// Get query client from either Ref or WidgetRef
+  QueryClient _getQueryClient() {
+    if (ref is Ref) {
+      return (ref as Ref).queryClient;
+    } else if (ref is WidgetRef) {
+      return (ref as WidgetRef).queryClient;
+    } else {
+      throw StateError('ref must be either Ref or WidgetRef');
+    }
+  }
+  
+  
+  /// Remove queries safely
+  void _removeQueries(String pattern) {
+    if (ref is Ref) {
+      (ref as Ref).removeQueries(pattern);
+    } else if (ref is WidgetRef) {
+      (ref as WidgetRef).removeQueries(pattern);
+    }
+  }
 
   SmartCachedFetcher({
     required this.ref,
@@ -450,8 +257,7 @@ class SmartCachedFetcher<T> {
 
   /// Fetch data with stale-while-revalidate strategy
   Future<void> fetch({bool forceRefresh = false}) async {
-    final queryClient = ref.queryClient;
-    final now = DateTime.now();
+    final queryClient = _getQueryClient();
 
     // Check if we have cached data
     final cachedData = queryClient.getQueryData<T>(cacheKey);
@@ -486,7 +292,9 @@ class SmartCachedFetcher<T> {
 
   /// Fetch data in background without showing loading state
   void _fetchInBackground() {
-    if (_isCurrentlyFetching) return;
+    if (_isCurrentlyFetching) {
+      return;
+    }
     
     _performFetch(showLoading: false).catchError((error) {
       // Silent error handling for background refresh
@@ -496,10 +304,12 @@ class SmartCachedFetcher<T> {
 
   /// Perform the actual fetch operation
   Future<void> _performFetch({bool showLoading = true}) async {
-    if (_isCurrentlyFetching) return;
+    if (_isCurrentlyFetching) {
+      return;
+    }
     
     _isCurrentlyFetching = true;
-    final queryClient = ref.queryClient;
+    final queryClient = _getQueryClient();
 
     try {
       // Fetch fresh data
@@ -533,13 +343,13 @@ class SmartCachedFetcher<T> {
 
   /// Clear cache
   void clearCache() {
-    ref.removeQueries(cacheKey);
+    _removeQueries(cacheKey);
     _lastFetchTime = null;
   }
 
   /// Get cached data without triggering fetch
   T? getCached() {
-    return ref.queryClient.getQueryData<T>(cacheKey);
+    return _getQueryClient().getQueryData<T>(cacheKey);
   }
 
   /// Check if data is cached
@@ -593,7 +403,7 @@ extension RiverpodQueryExtensions on Ref {
   ///   return result;
   /// }
   /// ```
-  QueryClient get queryClient => read(queryClientProvider);
+  QueryClient get queryClient => QueryClient.instance;
 
   /// Create a smart cached data fetcher with stale-while-revalidate strategy
   /// 
@@ -764,5 +574,49 @@ mixin QueryCapabilities<T> on StateNotifier<T> {
   void invalidateQueries(String pattern) {
     final queryClient = QueryClient();
     queryClient.invalidateQueries(pattern);
+  }
+}
+
+/// Extension for WidgetRef to support hooks integration
+extension WidgetRefQueryExtensions on WidgetRef {
+  /// Create a smart cached data fetcher with stale-while-revalidate strategy (for hooks)
+  SmartCachedFetcher<T> cachedFetcher<T>({
+    required Future<T> Function() fetchFn,
+    required void Function(T data) onData,
+    required void Function() onLoading,
+    required void Function(Object error) onError,
+    String? cacheKey,
+    Duration staleTime = const Duration(minutes: 5),
+    Duration cacheTime = const Duration(minutes: 30),
+    bool enableBackgroundRefresh = true,
+    bool enableWindowFocusRefresh = true,
+    bool cacheErrors = false,
+  }) {
+    return SmartCachedFetcher<T>(
+      ref: this,
+      fetchFn: fetchFn,
+      onData: onData,
+      onLoading: onLoading,
+      onError: onError,
+      cacheKey: cacheKey ?? 'smart-cache-${fetchFn.hashCode}',
+      staleTime: staleTime,
+      cacheTime: cacheTime,
+      enableBackgroundRefresh: enableBackgroundRefresh,
+      enableWindowFocusRefresh: enableWindowFocusRefresh,
+      cacheErrors: cacheErrors,
+    );
+  }
+  
+  /// Get query client for WidgetRef
+  QueryClient get queryClient => QueryClient.instance;
+  
+  /// Invalidate queries by pattern for WidgetRef
+  void invalidateQueries(String pattern) {
+    QueryClient.instance.invalidateQueries(pattern);
+  }
+  
+  /// Remove queries by pattern for WidgetRef
+  void removeQueries(String pattern) {
+    QueryClient.instance.removeQueries(pattern);
   }
 }

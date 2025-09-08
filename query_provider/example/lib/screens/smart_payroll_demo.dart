@@ -38,17 +38,17 @@ class SmartPayrollDemo extends ConsumerWidget {
 class _StrategyExplanation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '🎯 Stale-While-Revalidate 策略',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _StrategyStep(
               icon: '⚡',
               title: '立即响应',
@@ -113,17 +113,17 @@ class _StatusCard extends ConsumerWidget {
     // final payrollState = ref.watch(payrollCheckProvider);
     // final notifier = ref.read(payrollCheckProvider.notifier);
     
-    return Card(
+    return const Card(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '📊 实时状态',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             
             // 取消注释以显示实际状态：
             /*
@@ -344,28 +344,28 @@ class _FeatureHighlights extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             
-            _FeatureItem(
+            const _FeatureItem(
               icon: '⚡',
               title: 'Stale-While-Revalidate',
               description: '立即返回缓存，后台刷新数据',
               highlight: true,
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: '🔄',
               title: '智能后台刷新',
               description: '应用恢复时自动检查并刷新过期数据',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: '👁️',
               title: '窗口聚焦刷新',
               description: '窗口重新聚焦时自动刷新过期数据',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: '⏱️',
               title: '灵活的过期策略',
               description: 'staleTime 控制数据新鲜度判断',
             ),
-            _FeatureItem(
+            const _FeatureItem(
               icon: '🎯',
               title: '极简接入',
               description: '一行配置，三行代码完成复杂缓存逻辑',

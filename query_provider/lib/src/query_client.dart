@@ -9,39 +9,83 @@ class QueryClient {
   QueryClient({
     ProviderContainer? container,
     QueryCache? cache,
-  })  : _container = container ?? ProviderContainer(),
+  })  : _container = container,
         _cache = cache ?? getGlobalQueryCache();
+  
+  // Private constructor for singleton
+  QueryClient._internal() : _container = null, _cache = getGlobalQueryCache();
 
-  final ProviderContainer _container;
+  // Singleton instance
+  static QueryClient? _instance;
+  static QueryClient get instance => _instance ??= QueryClient._internal();
+  
+  /// Set the container for provider invalidation support
+  /// This should be called once during app initialization
+  static void setContainer(ProviderContainer container) {
+    if (_instance != null) {
+      _instance!._setContainer(container);
+    }
+  }
+  
+  void _setContainer(ProviderContainer container) {
+    _container ??= container;
+  }
+
+  ProviderContainer? _container;
   final QueryCache _cache;
   final Map<String, Timer> _refetchTimers = {};
 
+  /// Check if provider invalidation is supported
+  bool get supportsProviderInvalidation => _container != null;
+  
   /// Invalidate queries by key pattern
   void invalidateQueries(String keyPattern) {
-    // Find all providers that match the pattern
-    final matchingKeys = _container.getAllProviderElements()
+    // Always clear cache entries matching the pattern
+    _cache.removeByPattern(keyPattern);
+    
+    // If no container, cache clearing is all we can do
+    if (_container == null) {
+      debugPrint('⚠️ QueryClient: Provider invalidation not available. Only cache cleared for pattern: $keyPattern');
+      return;
+    }
+    
+    // Find all providers that match the pattern and invalidate them
+    final matchingKeys = _container!.getAllProviderElements()
         .where((element) => element.provider.name?.contains(keyPattern) ?? false)
         .map((element) => element.provider)
         .toList();
 
     for (final provider in matchingKeys) {
-      _container.invalidate(provider);
+      _container!.invalidate(provider);
     }
+    
+    debugPrint('✅ QueryClient: Invalidated ${matchingKeys.length} providers for pattern: $keyPattern');
   }
 
   /// Invalidate all queries
   void invalidateAll() {
-    // Invalidate all providers in the container
-    final elements = _container.getAllProviderElements();
-    for (final element in elements) {
-      _container.invalidate(element.provider);
+    // Always clear all cache
+    _cache.clear();
+    
+    // If no container, cache clearing is all we can do
+    if (_container == null) {
+      debugPrint('⚠️ QueryClient: Provider invalidation not available. Only cache cleared.');
+      return;
     }
+    
+    // Invalidate all providers in the container
+    final elements = _container!.getAllProviderElements();
+    for (final element in elements) {
+      _container!.invalidate(element.provider);
+    }
+    
+    debugPrint('✅ QueryClient: Invalidated all ${elements.length} providers and cleared cache.');
   }
 
   /// Remove queries from cache by key pattern
   void removeQueries(String keyPattern) {
     // Remove from cache
-    final removedCount = _cache.removeByPattern(keyPattern);
+    _cache.removeByPattern(keyPattern);
     
     // Invalidate matching providers
     invalidateQueries(keyPattern);
@@ -64,7 +108,7 @@ class QueryClient {
   /// Get query data from cache
   T? getQueryData<T>(String queryKey) {
     final entry = _cache.get<T>(queryKey);
-    return entry?.hasData == true ? entry!.data as T : null;
+    return entry?.hasData??false ? entry!.data as T : null;
   }
 
   /// Get cache entry with metadata
@@ -109,22 +153,31 @@ class QueryClient {
     _refetchTimers.remove(key);
   }
 
-  /// Dispose the client and clean up resources
-  void dispose() {
+  /// Clean up timers only (for singleton usage)
+  void _cleanupTimers() {
     for (final timer in _refetchTimers.values) {
       timer.cancel();
     }
     _refetchTimers.clear();
+  }
+
+  /// Dispose the client and clean up resources
+  void dispose() {
+    _cleanupTimers();
     // Note: We don't dispose the container here as it's shared with the widget tree
     // Note: We don't dispose the cache here as it might be shared
   }
 }
 
-/// Global query client provider
+/// Global query client provider - Singleton pattern with auto container setup
 final queryClientProvider = Provider<QueryClient>((ref) {
-  // Use the same container that this provider is running in
-  final client = QueryClient(container: ref.container);
-  ref.onDispose(client.dispose);
+  // Create a singleton instance and automatically set the container
+  final client = QueryClient.instance;
+  
+  // Automatically set the container for provider invalidation support
+  QueryClient.setContainer(ref.container);
+  
+  ref.onDispose(client._cleanupTimers);
   return client;
 });
 

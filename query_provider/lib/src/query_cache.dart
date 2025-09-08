@@ -154,7 +154,7 @@ class QueryCache {
   final QueryCacheEventCallback? onEvent;
 
   /// Internal cache storage
-  final Map<String, QueryCacheEntry> _cache = LinkedHashMap<String, QueryCacheEntry>();
+  final Map<String, QueryCacheEntry<dynamic>> _cache = <String, QueryCacheEntry<dynamic>>{};
 
   /// Cache change listeners by key
   final Map<String, Set<void Function(QueryCacheEntry<dynamic>?)>> _listeners = {};
@@ -458,7 +458,7 @@ class QueryCache {
   }
 
   /// Emit cache event
-  void _emitEvent(QueryCacheEventType type, String key, [QueryCacheEntry? entry]) {
+  void _emitEvent(QueryCacheEventType type, String key, [QueryCacheEntry<dynamic>? entry]) {
     onEvent?.call(QueryCacheEvent(
       type: type,
       key: key,
