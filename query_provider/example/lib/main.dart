@@ -1,12 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:query_provider/query_provider.dart';
-
-import 'models/user.dart';
-import 'models/post.dart';
-import 'services/api_service.dart';
-import 'providers/user_providers.dart';
-import 'providers/post_providers.dart';
 import 'screens/home_screen.dart';
 
 void main() {

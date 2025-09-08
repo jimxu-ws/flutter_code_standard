@@ -1,10 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
 
-import 'query_options.dart';
-import 'query_client.dart';
 import 'query_cache.dart';
+import 'query_client.dart';
+import 'query_options.dart';
 
 /// A function that fetches a page of data
 typedef InfiniteQueryFunction<T, TPageParam> = Future<T> Function(TPageParam pageParam);
@@ -264,7 +265,7 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
     } catch (error, stackTrace) {
       if (_retryCount < options.retry) {
         _retryCount++;
-        await Future.delayed(options.retryDelay);
+        await Future<void>.delayed(options.retryDelay);
         return _fetchFirstPage();
       }
 

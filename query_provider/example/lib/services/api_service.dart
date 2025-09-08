@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math';
 
 import '../models/user.dart';
@@ -187,5 +186,15 @@ class ApiService {
     await _delay();
     _maybeThrow();
     // Simulate successful deletion
+  }
+
+  /// Fetch active users
+  static Future<List<User>> fetchActiveUsers() async {
+    await _delay();
+    _maybeThrow();
+    
+    // Return a subset of users as "active"
+    final allUsers = await fetchUsers();
+    return allUsers.take(3).toList(); // Simulate first 3 users as active
   }
 }

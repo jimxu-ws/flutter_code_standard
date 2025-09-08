@@ -121,25 +121,7 @@ class AppLifecycleManager extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
   
-  void _notifyWindowFocusCallbacks() {
-    for (final callback in _onWindowFocusCallbacks) {
-      try {
-        callback();
-      } catch (e) {
-        debugPrint('Error in window focus callback: $e');
-      }
-    }
-  }
   
-  void _notifyWindowBlurCallbacks() {
-    for (final callback in _onWindowBlurCallbacks) {
-      try {
-        callback();
-      } catch (e) {
-        debugPrint('Error in window blur callback: $e');
-      }
-    }
-  }
   
   @override
   void dispose() {

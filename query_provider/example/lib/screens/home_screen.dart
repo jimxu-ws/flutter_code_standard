@@ -9,6 +9,11 @@ import 'posts_screen.dart';
 import 'user_search_screen.dart';
 import 'provider_comparison_screen.dart';
 import 'cache_debug_screen.dart';
+import 'annotated_example_screen.dart';
+import 'riverpod_annotated_demo_screen.dart';
+import 'smart_payroll_demo.dart';
+import 'payroll_hooks_example.dart';
+import 'hooks_comparison.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,7 +21,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 4,
+      length: 9,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Query Provider Example'),
@@ -35,11 +40,17 @@ class HomeScreen extends ConsumerWidget {
             ),
           ],
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Users', icon: Icon(Icons.people)),
               Tab(text: 'Posts', icon: Icon(Icons.article)),
               Tab(text: 'Search', icon: Icon(Icons.search)),
               Tab(text: 'Mutations', icon: Icon(Icons.edit)),
+              Tab(text: 'Utils示例', icon: Icon(Icons.extension)),
+              Tab(text: '@riverpod示例', icon: Icon(Icons.code)),
+              Tab(text: 'Smart Cache', icon: Icon(Icons.rocket_launch)),
+              Tab(text: 'Hooks示例', icon: Icon(Icons.interests)),
+              Tab(text: 'Hooks对比', icon: Icon(Icons.compare_arrows)),
             ],
           ),
         ),
@@ -49,6 +60,11 @@ class HomeScreen extends ConsumerWidget {
             PostsTab(),
             SearchTab(),
             MutationsTab(),
+            AnnotatedExampleScreen(),
+            RiverpodAnnotatedDemoScreen(),
+            SmartPayrollDemo(),
+            PayrollHooksExample(),
+            HooksComparison(),
           ],
         ),
       ),

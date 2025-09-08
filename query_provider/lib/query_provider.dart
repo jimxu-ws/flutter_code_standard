@@ -11,6 +11,8 @@ export 'src/query_options.dart';
 export 'src/mutation_options.dart';
 export 'src/extensions/query_extensions.dart';
 export 'src/extensions/riverpod_extensions.dart';
+export 'src/extensions/event_driven_cache.dart';
+export 'src/hooks/query_hooks.dart';
 export 'src/app_lifecycle_manager.dart';
 export 'src/window_focus_manager.dart';
 

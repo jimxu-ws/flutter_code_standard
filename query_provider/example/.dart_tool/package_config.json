@@ -44,6 +44,12 @@
       "languageVersion": "3.3"
     },
     {
+      "name": "flutter_hooks",
+      "rootUri": "file:///Users/jim.xu/.pub-cache/hosted/pub.dev/flutter_hooks-0.20.5",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "flutter_lints",
       "rootUri": "file:///Users/jim.xu/.pub-cache/hosted/pub.dev/flutter_lints-3.0.2",
       "packageUri": "lib/",
@@ -60,6 +66,12 @@
       "rootUri": "file:///Users/jim.xu/fvm/versions/3.27.4/packages/flutter_test",
       "packageUri": "lib/",
       "languageVersion": "3.3"
+    },
+    {
+      "name": "hooks_riverpod",
+      "rootUri": "file:///Users/jim.xu/.pub-cache/hosted/pub.dev/hooks_riverpod-2.6.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
     },
     {
       "name": "leak_tracker",
@@ -194,7 +206,7 @@
       "languageVersion": "3.0"
     }
   ],
-  "generated": "2025-09-06T03:35:52.450528Z",
+  "generated": "2025-09-08T10:09:23.045604Z",
   "generator": "pub",
   "generatorVersion": "3.6.2",
   "flutterRoot": "file:///Users/jim.xu/fvm/versions/3.27.4",
