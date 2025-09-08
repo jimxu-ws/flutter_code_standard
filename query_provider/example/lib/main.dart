@@ -11,6 +11,8 @@ import 'screens/home_screen.dart';
 
 void main() {
   runApp(
+    // Use ProviderScope to ensure all providers share the same container
+    // This is critical for QueryClient to properly invalidate providers
     const ProviderScope(
       child: MyApp(),
     ),

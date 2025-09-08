@@ -20,7 +20,7 @@ class QueryClient {
   void invalidateQueries(String keyPattern) {
     // Find all providers that match the pattern
     final matchingKeys = _container.getAllProviderElements()
-        .where((element) => element.provider.name?.contains(keyPattern) == true)
+        .where((element) => element.provider.name?.contains(keyPattern) ?? false)
         .map((element) => element.provider)
         .toList();
 
@@ -115,14 +115,15 @@ class QueryClient {
       timer.cancel();
     }
     _refetchTimers.clear();
-    _container.dispose();
+    // Note: We don't dispose the container here as it's shared with the widget tree
     // Note: We don't dispose the cache here as it might be shared
   }
 }
 
 /// Global query client provider
 final queryClientProvider = Provider<QueryClient>((ref) {
-  final client = QueryClient();
+  // Use the same container that this provider is running in
+  final client = QueryClient(container: ref.container);
   ref.onDispose(client.dispose);
   return client;
 });

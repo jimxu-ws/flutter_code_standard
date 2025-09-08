@@ -16,7 +16,6 @@ class MutationNotifier<TData, TVariables> extends StateNotifier<MutationState<TD
   MutationNotifier({
     required this.mutationFn,
     required this.options,
-    required Ref ref,
   }) : super(const MutationIdle());
 
   final MutationFunction<TData, TVariables> mutationFn;
@@ -73,7 +72,6 @@ StateNotifierProvider<MutationNotifier<TData, TVariables>, MutationState<TData>>
     (ref) => MutationNotifier<TData, TVariables>(
       mutationFn: mutationFn,
       options: options,
-      ref: ref,
     ),
     name: name,
   );

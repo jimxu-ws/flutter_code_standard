@@ -436,9 +436,7 @@ class QueryCache {
 QueryCache? _globalCache;
 
 /// Get or create the global cache instance
-QueryCache getGlobalQueryCache() {
-  return _globalCache ??= QueryCache();
-}
+QueryCache getGlobalQueryCache() => _globalCache ??= QueryCache();
 
 /// Set a custom global cache instance
 void setGlobalQueryCache(QueryCache cache) {
