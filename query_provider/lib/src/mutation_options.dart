@@ -32,15 +32,13 @@ class MutationOptions<TData, TVariables> {
     void Function(TData data, TVariables variables)? onSuccess,
     void Function(Object error, TVariables variables, StackTrace? stackTrace)? onError,
     Future<void> Function(TVariables variables)? onMutate,
-  }) {
-    return MutationOptions<TData, TVariables>(
+  }) => MutationOptions<TData, TVariables>(
       retry: retry ?? this.retry,
       retryDelay: retryDelay ?? this.retryDelay,
       onSuccess: onSuccess ?? this.onSuccess,
       onError: onError ?? this.onError,
       onMutate: onMutate ?? this.onMutate,
     );
-  }
 
   @override
   bool operator ==(Object other) =>
