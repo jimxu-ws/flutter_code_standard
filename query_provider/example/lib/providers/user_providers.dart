@@ -3,7 +3,7 @@ import 'package:query_provider/query_provider.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 
-/// Query provider for fetching all users
+/// Query provider for fetching all users (traditional approach)
 final usersQueryProvider = queryProvider<List<User>>(
   name: 'users',
   queryFn: ApiService.fetchUsers,
@@ -13,6 +13,75 @@ final usersQueryProvider = queryProvider<List<User>>(
     refetchOnMount: true,
   ),
 );
+
+/// Hook-based users query (use in HookConsumerWidget)
+/// 
+/// Usage example:
+/// ```dart
+/// class UsersTab extends HookConsumerWidget {
+///   @override
+///   Widget build(BuildContext context, WidgetRef ref) {
+///     final usersQuery = useUsersQuery(ref);
+///     
+///     if (usersQuery.isLoading) return CircularProgressIndicator();
+///     if (usersQuery.hasError) return Text('Error: ${usersQuery.error}');
+///     if (usersQuery.hasData) {
+///       return ListView.builder(
+///         itemCount: usersQuery.data!.length,
+///         itemBuilder: (context, index) => ListTile(
+///           title: Text(usersQuery.data![index].name),
+///         ),
+///       );
+///     }
+///     return ElevatedButton(
+///       onPressed: usersQuery.refetch,
+///       child: Text('Load Users'),
+///     );
+///   }
+/// }
+/// ```
+SmartQueryResult<List<User>> useUsersQuery(WidgetRef ref) {
+  return useSmartQuery<List<User>>(
+    ref: ref,
+    fetchFn: ApiService.fetchUsers,
+    cacheKey: 'users',
+    staleTime: const Duration(minutes: 5),
+    cacheTime: const Duration(minutes: 10),
+    enableBackgroundRefresh: true,
+    enableWindowFocusRefresh: true,
+    cacheErrors: false,
+  );
+}
+
+/// Hook-based single user query (use in HookConsumerWidget)
+/// 
+/// Usage example:
+/// ```dart
+/// class UserDetailWidget extends HookConsumerWidget {
+///   final int userId;
+///   
+///   @override
+///   Widget build(BuildContext context, WidgetRef ref) {
+///     final userQuery = useUserQuery(ref, userId);
+///     
+///     return userQuery.data != null 
+///         ? Text(userQuery.data!.name)
+///         : CircularProgressIndicator();
+///   }
+/// }
+/// ```
+SmartQueryResult<User> useUserQuery(WidgetRef ref, int userId) {
+  return useSmartQuery<User>(
+    ref: ref,
+    fetchFn: () => ApiService.fetchUser(userId),
+    cacheKey: 'user-$userId',
+    staleTime: const Duration(minutes: 3),
+    cacheTime: const Duration(minutes: 15),
+    enableBackgroundRefresh: true,
+    enableWindowFocusRefresh: true,
+    cacheErrors: false,
+  );
+}
 
 /// Query provider for fetching a single user by ID (using function approach)
 StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userQueryProvider(int userId) {
