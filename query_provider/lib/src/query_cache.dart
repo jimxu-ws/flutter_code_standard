@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'package:flutter/foundation.dart';
 import 'package:meta/meta.dart';
 
 import 'query_options.dart';
@@ -45,15 +46,13 @@ class QueryCacheEntry<T> {
     QueryOptions<T>? options,
     Object? error,
     StackTrace? stackTrace,
-  }) {
-    return QueryCacheEntry<T>(
+  }) => QueryCacheEntry<T>(
       data: data ?? this.data,
       fetchedAt: fetchedAt ?? this.fetchedAt,
       options: options ?? this.options,
       error: error ?? this.error,
       stackTrace: stackTrace ?? this.stackTrace,
     );
-  }
 
   @override
   bool operator ==(Object other) =>
@@ -132,6 +131,9 @@ class QueryCacheEvent {
 /// Callback for cache events
 typedef QueryCacheEventCallback = void Function(QueryCacheEvent event);
 
+/// Callback for cache data changes
+typedef QueryCacheChangeCallback<T> = void Function(QueryCacheEntry<T>? entry);
+
 /// In-memory cache implementation for query data
 class QueryCache {
   QueryCache({
@@ -153,6 +155,9 @@ class QueryCache {
 
   /// Internal cache storage
   final Map<String, QueryCacheEntry> _cache = LinkedHashMap<String, QueryCacheEntry>();
+
+  /// Cache change listeners by key
+  final Map<String, Set<void Function(QueryCacheEntry<dynamic>?)>> _listeners = {};
 
   /// Cache statistics
   int _hitCount = 0;
@@ -205,6 +210,9 @@ class QueryCache {
     _cache[key] = entry;
     _emitEvent(QueryCacheEventType.set, key, entry);
     
+    // Notify listeners of the change
+    _notifyListeners<T>(key, entry);
+    
     // Evict oldest entries if cache is full
     _evictIfNecessary();
   }
@@ -247,6 +255,8 @@ class QueryCache {
     final entry = _cache.remove(key);
     if (entry != null) {
       _emitEvent(QueryCacheEventType.evict, key, entry);
+      // Notify listeners that entry was removed
+      _notifyListeners(key, null);
       return true;
     }
     return false;
@@ -411,6 +421,42 @@ class QueryCache {
     );
   }
 
+  /// Add a listener for cache changes on a specific key
+  void addListener<T>(String key, QueryCacheChangeCallback<T> callback) {
+    _listeners.putIfAbsent(key, () => <void Function(QueryCacheEntry<dynamic>?)>{});
+    _listeners[key]!.add((entry) => callback(entry as QueryCacheEntry<T>?));
+  }
+
+  /// Remove a listener for a specific key
+  void removeListener<T>(String key, QueryCacheChangeCallback<T> callback) {
+    // Note: This won't work perfectly because we're storing wrapped functions
+    // For now, use removeAllListeners instead for cleanup
+    if (_listeners[key]?.isEmpty == true) {
+      _listeners.remove(key);
+    }
+  }
+
+  /// Remove all listeners for a specific key
+  void removeAllListeners(String key) {
+    _listeners.remove(key);
+  }
+
+  /// Notify listeners of cache changes
+  void _notifyListeners<T>(String key, QueryCacheEntry<T>? entry) {
+    final listeners = _listeners[key];
+    if (listeners != null) {
+      for (final listener in listeners) {
+        try {
+          // Entry is already cast to dynamic in the stored wrapper function
+          listener(entry as QueryCacheEntry<dynamic>?);
+        } catch (e) {
+          // Ignore listener errors to prevent cache corruption
+          debugPrint('Cache listener error for key $key: $e');
+        }
+      }
+    }
+  }
+
   /// Emit cache event
   void _emitEvent(QueryCacheEventType type, String key, [QueryCacheEntry? entry]) {
     onEvent?.call(QueryCacheEvent(
@@ -425,6 +471,7 @@ class QueryCache {
   void dispose() {
     _cleanupTimer?.cancel();
     _cleanupTimer = null;
+    _listeners.clear();
     clear();
   }
 

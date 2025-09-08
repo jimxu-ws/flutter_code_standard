@@ -60,50 +60,138 @@ StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userQueryWithParams
 }
 
 /// Mutation provider for creating a new user
-final createUserMutationProvider = mutationProvider<User, Map<String, dynamic>>(
-  name: 'create-user',
-  mutationFn: ApiService.createUser,
-  options: MutationOptions<User, Map<String, dynamic>>(
-    onSuccess: (user, variables) {
-      print('User created successfully: ${user.name}');
-      // In a real app, you might invalidate the users query here
-    },
-    onError: (error, variables, stackTrace) {
-      print('Failed to create user: $error');
-    },
+final createUserMutationProvider = StateNotifierProvider.family<MutationNotifier<User, Map<String, dynamic>>, MutationState<User>, void>(
+  (ref, _) => MutationNotifier<User, Map<String, dynamic>>(
+    mutationFn: ApiService.createUser,
+    options: MutationOptions<User, Map<String, dynamic>>(
+      onMutate: (variables) async {
+        final queryClient = ref.read(queryClientProvider);
+        
+        // Optimistic update: Add the new user to the cache immediately
+        final currentUsers = queryClient.getQueryData<List<User>>('users');
+        if (currentUsers != null) {
+          final newUser = User(
+            id: DateTime.now().millisecondsSinceEpoch, // Temporary ID
+            name: variables['name'] as String,
+            email: variables['email'] as String,
+            avatar: variables['avatar'] as String?,
+          );
+          queryClient.setQueryData<List<User>>('users', [...currentUsers, newUser]);
+        }
+      },
+      onSuccess: (user, variables) async {
+        final queryClient = ref.read(queryClientProvider);
+        print('User created successfully: ${user.name}');
+        
+        // Invalidate users query to refetch fresh data from server
+        queryClient.invalidateQueries('users');
+        
+        // Also invalidate user search queries as they might include this new user
+        queryClient.invalidateQueries('userSearch');
+      },
+      onError: (error, variables, stackTrace) async {
+        final queryClient = ref.read(queryClientProvider);
+        print('Failed to create user: $error');
+        
+        // Rollback optimistic update by invalidating the cache
+        queryClient.invalidateQueries('users');
+      },
+    ),
   ),
 );
 
 /// Mutation provider for updating a user
-StateNotifierProvider<MutationNotifier<User, Map<String, dynamic>>, MutationState<User>> updateUserMutationProvider(int userId) {
-  return mutationProvider<User, Map<String, dynamic>>(
-    name: 'update-user-$userId',
+final updateUserMutationProvider = StateNotifierProvider.family<MutationNotifier<User, Map<String, dynamic>>, MutationState<User>, int>(
+  (ref, userId) => MutationNotifier<User, Map<String, dynamic>>(
     mutationFn: (variables) => ApiService.updateUser(userId, variables),
     options: MutationOptions<User, Map<String, dynamic>>(
-      onSuccess: (user, variables) {
-        print('User updated successfully: ${user.name}');
-        // In a real app, you might invalidate related queries here
+      onMutate: (variables) async {
+        final queryClient = ref.read(queryClientProvider);
+        
+        // Optimistic update: Update the user in the cache immediately
+        final currentUsers = queryClient.getQueryData<List<User>>('users');
+        if (currentUsers != null) {
+          final updatedUsers = currentUsers.map((user) {
+            if (user.id == userId) {
+              return User(
+                id: user.id,
+                name: variables['name'] as String? ?? user.name,
+                email: variables['email'] as String? ?? user.email,
+                avatar: variables['avatar'] as String? ?? user.avatar,
+              );
+            }
+            return user;
+          }).toList();
+          queryClient.setQueryData<List<User>>('users', updatedUsers);
+        }
+        
+        // Also update individual user cache
+        final currentUser = queryClient.getQueryData<User>('user-$userId');
+        if (currentUser != null) {
+          final updatedUser = User(
+            id: currentUser.id,
+            name: variables['name'] as String? ?? currentUser.name,
+            email: variables['email'] as String? ?? currentUser.email,
+            avatar: variables['avatar'] as String? ?? currentUser.avatar,
+          );
+          queryClient.setQueryData<User>('user-$userId', updatedUser);
+        }
       },
-      onError: (error, variables, stackTrace) {
+      onSuccess: (user, variables) async {
+        final queryClient = ref.read(queryClientProvider);
+        print('User updated successfully: ${user.name}');
+        
+        // Invalidate related queries to ensure fresh data
+        queryClient.invalidateQueries('users');
+        queryClient.invalidateQueries('user-$userId');
+        queryClient.invalidateQueries('userSearch');
+      },
+      onError: (error, variables, stackTrace) async {
+        final queryClient = ref.read(queryClientProvider);
         print('Failed to update user: $error');
+        
+        // Rollback optimistic updates
+        queryClient.invalidateQueries('users');
+        queryClient.invalidateQueries('user-$userId');
       },
     ),
-  );
-}
+  ),
+);
 
 /// Mutation provider for deleting a user
-StateNotifierProvider<MutationNotifier<void, int>, MutationState<void>> deleteUserMutationProvider(int userId) {
-  return mutationProvider<void, int>(
-    name: 'delete-user-$userId',
+final deleteUserMutationProvider = StateNotifierProvider.family<MutationNotifier<void, int>, MutationState<void>, int>(
+  (ref, userId) => MutationNotifier<void, int>(
     mutationFn: (id) => ApiService.deleteUser(id),
     options: MutationOptions<void, int>(
-      onSuccess: (_, id) {
-        print('User $id deleted successfully');
-        // In a real app, you might invalidate the users query here
+      onMutate: (id) async {
+        final queryClient = ref.read(queryClientProvider);
+        
+        // Optimistic update: Remove the user from the cache immediately
+        final currentUsers = queryClient.getQueryData<List<User>>('users');
+        if (currentUsers != null) {
+          final updatedUsers = currentUsers.where((user) => user.id != id).toList();
+          queryClient.setQueryData<List<User>>('users', updatedUsers);
+        }
+        
+        // Remove individual user cache entry
+        queryClient.removeQueries('user-$id');
       },
-      onError: (error, id, stackTrace) {
+      onSuccess: (_, id) async {
+        final queryClient = ref.read(queryClientProvider);
+        print('User $id deleted successfully');
+        
+        // Invalidate queries to ensure consistency
+        queryClient.invalidateQueries('users');
+        queryClient.invalidateQueries('userSearch');
+        queryClient.removeQueries('user-$id');
+      },
+      onError: (error, id, stackTrace) async {
+        final queryClient = ref.read(queryClientProvider);
         print('Failed to delete user $id: $error');
+        
+        // Rollback optimistic update
+        queryClient.invalidateQueries('users');
       },
     ),
-  );
-}
+  ),
+);

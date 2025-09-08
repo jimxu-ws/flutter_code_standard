@@ -24,7 +24,6 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
     required this.queryFn,
     required this.options,
     required this.queryKey,
-    required Ref ref,
   }) : super(const QueryIdle()) {
     _initialize();
   }
@@ -46,6 +45,9 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
     _lifecycleManager = AppLifecycleManager.instance;
     _windowFocusManager = WindowFocusManager.instance;
     
+    // Set up cache change listener for automatic UI updates
+    _setupCacheListener();
+    
     // Set up lifecycle and window focus callbacks
     _setupLifecycleCallbacks();
     _setupWindowFocusCallbacks();
@@ -62,7 +64,9 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
 
   /// Fetch data
   Future<void> _fetch() async {
-    if (!options.enabled) return;
+    if (!options.enabled) {
+      return;
+    }
 
     // Check cache first
     final cachedEntry = _getCachedEntry();
@@ -213,9 +217,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
     }
   }
 
-  QueryCacheEntry<T>? _getCachedEntry() {
-    return _cache.get<T>(queryKey);
-  }
+  QueryCacheEntry<T>? _getCachedEntry() => _cache.get<T>(queryKey);
 
   void _setCachedEntry(QueryCacheEntry<T> entry) {
     _cache.set(queryKey, entry);
@@ -225,9 +227,26 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
     _cache.remove(queryKey);
   }
 
+  /// Set up cache change listener for automatic UI updates
+  void _setupCacheListener() {
+    _cache.addListener<T>(queryKey, (entry) {
+      print('Cache listener called for key $queryKey in query notifier');
+      if (entry?.hasData ?? false) {
+        // Update state when cache data changes externally (e.g., optimistic updates)
+        state = QuerySuccess(entry!.data as T, fetchedAt: entry.fetchedAt);
+      } else if (entry == null) {
+        // Cache entry was removed, reset to idle
+        state = const QueryIdle();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _refetchTimer?.cancel();
+    
+    // Clean up cache listener
+    _cache.removeAllListeners(queryKey);
     
     // Clean up lifecycle callbacks
     if (options.refetchOnAppFocus) {
@@ -251,34 +270,28 @@ StateNotifierProvider<QueryNotifier<T>, QueryState<T>> queryProvider<T>({
   required String name,
   required QueryFunction<T> queryFn,
   QueryOptions<T> options = const QueryOptions(),
-}) {
-  return StateNotifierProvider<QueryNotifier<T>, QueryState<T>>(
+}) => StateNotifierProvider<QueryNotifier<T>, QueryState<T>>(
     (ref) => QueryNotifier<T>(
       queryFn: queryFn,
       options: options,
       queryKey: name,
-      ref: ref,
     ),
     name: name,
   );
-}
 
 /// Provider family for creating queries with parameters
 StateNotifierProviderFamily<QueryNotifier<T>, QueryState<T>, P> queryProviderFamily<T, P>({
   required String name,
   required QueryFunctionWithParams<T, P> queryFn,
   QueryOptions<T> options = const QueryOptions(),
-}) {
-  return StateNotifierProvider.family<QueryNotifier<T>, QueryState<T>, P>(
+}) => StateNotifierProvider.family<QueryNotifier<T>, QueryState<T>, P>(
     (ref, param) => QueryNotifier<T>(
       queryFn: () => queryFn(param),
       options: options,
       queryKey: '$name-$param',
-      ref: ref,
     ),
     name: name,
   );
-}
 
 /// Convenience function for creating parameterized queries with constant parameters
 StateNotifierProvider<QueryNotifier<T>, QueryState<T>> queryProviderWithParams<T, P>({
@@ -286,17 +299,14 @@ StateNotifierProvider<QueryNotifier<T>, QueryState<T>> queryProviderWithParams<T
   required P params, // Should be const for best practices
   required QueryFunctionWithParams<T, P> queryFn,
   QueryOptions<T> options = const QueryOptions(),
-}) {
-  return StateNotifierProvider<QueryNotifier<T>, QueryState<T>>(
+}) => StateNotifierProvider<QueryNotifier<T>, QueryState<T>>(
     (ref) => QueryNotifier<T>(
       queryFn: () => queryFn(params),
       options: options,
       queryKey: '$name-$params',
-      ref: ref,
     ),
     name: '$name-$params',
   );
-}
 
 /// Extension methods for easier query usage
 extension QueryStateExtensions<T> on QueryState<T> {
@@ -307,24 +317,20 @@ extension QueryStateExtensions<T> on QueryState<T> {
     R Function(T data)? success,
     R Function(Object error, StackTrace? stackTrace)? error,
     R Function(T data)? refetching,
-  }) {
-    return switch (this) {
+  }) => switch (this) {
       QueryIdle<T>() => idle?.call(),
       QueryLoading<T>() => loading?.call(),
-      QuerySuccess<T> successState => success?.call(successState.data),
-      QueryError<T> errorState => error?.call(errorState.error, errorState.stackTrace),
-      QueryRefetching<T> refetchingState => refetching?.call(refetchingState.previousData),
+      final QuerySuccess<T> successState => success?.call(successState.data),
+      final QueryError<T> errorState => error?.call(errorState.error, errorState.stackTrace),
+      final QueryRefetching<T> refetchingState => refetching?.call(refetchingState.previousData),
     };
-  }
 
   /// Map the data if the query is successful
-  QueryState<R> map<R>(R Function(T data) mapper) {
-    return switch (this) {
-      QuerySuccess<T> success => QuerySuccess(mapper(success.data), fetchedAt: success.fetchedAt),
-      QueryRefetching<T> refetching => QueryRefetching(mapper(refetching.previousData), fetchedAt: refetching.fetchedAt),
+  QueryState<R> map<R>(R Function(T data) mapper) => switch (this) {
+      final QuerySuccess<T> success => QuerySuccess(mapper(success.data), fetchedAt: success.fetchedAt),
+      final QueryRefetching<T> refetching => QueryRefetching(mapper(refetching.previousData), fetchedAt: refetching.fetchedAt),
       QueryIdle<T>() => QueryIdle<R>(),
       QueryLoading<T>() => QueryLoading<R>(),
-      QueryError<T> error => QueryError<R>(error.error, stackTrace: error.stackTrace),
+      final QueryError<T> error => QueryError<R>(error.error, stackTrace: error.stackTrace),
     };
-  }
 }

@@ -3,9 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
 import '../providers/user_providers.dart';
-import '../providers/post_providers.dart';
 import '../models/user.dart';
-import '../models/post.dart';
 import 'user_detail_screen.dart';
 import 'posts_screen.dart';
 import 'user_search_screen.dart';
@@ -158,13 +156,15 @@ class UsersTab extends ConsumerWidget {
   }
 }
 
-class UserListTile extends StatelessWidget {
+class UserListTile extends ConsumerWidget {
   const UserListTile({super.key, required this.user});
 
   final User user;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final deleteUserMutation = ref.watch(deleteUserMutationProvider(user.id));
+    
     return ListTile(
       leading: CircleAvatar(
         backgroundImage: user.avatar != null ? NetworkImage(user.avatar!) : null,
@@ -172,7 +172,28 @@ class UserListTile extends StatelessWidget {
       ),
       title: Text(user.name),
       subtitle: Text(user.email),
-      trailing: const Icon(Icons.arrow_forward_ios),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          switch (deleteUserMutation) {
+            MutationIdle<void>() => IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _showDeleteDialog(context, ref),
+            ),
+            MutationLoading<void>() => const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            MutationSuccess<void>() => const Icon(Icons.check, color: Colors.green),
+            MutationError<void>() => IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () => _showDeleteDialog(context, ref),
+            ),
+          },
+          const Icon(Icons.arrow_forward_ios),
+        ],
+      ),
       onTap: () {
         Navigator.push(
           context,
@@ -181,6 +202,42 @@ class UserListTile extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+  
+  void _showDeleteDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Text('Are you sure you want to delete ${user.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await ref.read(deleteUserMutationProvider(user.id).notifier).mutate(user.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${user.name} deleted successfully!')),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete ${user.name}: $e')),
+                  );
+                }
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -223,7 +280,7 @@ class _MutationsTabState extends ConsumerState<MutationsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final createUserMutation = createUserMutationProvider.use(ref);
+    final createUserMutation = ref.watch(createUserMutationProvider(null));
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -264,7 +321,7 @@ class _MutationsTabState extends ConsumerState<MutationsTab> {
                     }
 
                     try {
-                      await createUserMutation.mutate({
+                      await ref.read(createUserMutationProvider(null).notifier).mutate({
                         'name': _nameController.text,
                         'email': _emailController.text,
                       });

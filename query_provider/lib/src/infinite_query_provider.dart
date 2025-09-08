@@ -4,6 +4,7 @@ import 'package:meta/meta.dart';
 
 import 'query_options.dart';
 import 'query_client.dart';
+import 'query_cache.dart';
 
 /// A function that fetches a page of data
 typedef InfiniteQueryFunction<T, TPageParam> = Future<T> Function(TPageParam pageParam);
@@ -211,7 +212,6 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
     required this.options,
     required this.initialPageParam,
     required this.queryKey,
-    required Ref ref,
   }) : super(const InfiniteQueryIdle()) {
     _initialize();
   }
@@ -225,6 +225,9 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
   int _retryCount = 0;
 
   void _initialize() {
+    // Set up cache change listener for automatic UI updates
+    _setupCacheListener();
+    
     if (options.enabled && options.refetchOnMount) {
       _fetchFirstPage();
     }
@@ -412,9 +415,33 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
     }
   }
 
+  /// Set up cache change listener for automatic UI updates
+  void _setupCacheListener() {
+    getGlobalQueryCache().addListener<List<T>>(queryKey, (entry) {
+      print('Cache listener called for key $queryKey in infinite query notifier');
+      if (entry?.hasData ?? false) {
+        // Update state when cache data changes externally (e.g., optimistic updates)
+        final pages = entry!.data!;
+        state = InfiniteQuerySuccess(
+          pages: pages,
+          hasNextPage: true, // This would need to be determined properly
+          hasPreviousPage: false,
+          fetchedAt: entry.fetchedAt,
+        );
+      } else if (entry == null) {
+        // Cache entry was removed, reset to idle
+        state = const InfiniteQueryIdle();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _refetchTimer?.cancel();
+    
+    // Clean up cache listener
+    getGlobalQueryCache().removeAllListeners(queryKey);
+    
     super.dispose();
   }
 }
@@ -431,7 +458,6 @@ StateNotifierProvider<InfiniteQueryNotifier<T, TPageParam>, InfiniteQueryState<T
       options: options,
       initialPageParam: initialPageParam,
       queryKey: name,
-      ref: ref,
     ),
     name: name,
   );

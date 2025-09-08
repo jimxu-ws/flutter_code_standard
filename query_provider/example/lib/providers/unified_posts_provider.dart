@@ -81,7 +81,6 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
         staleTime: const Duration(minutes: 2),
         cacheTime: const Duration(minutes: 10),
       ),
-      ref: _ref,
     );
 
     // Listen to infinite query state changes
