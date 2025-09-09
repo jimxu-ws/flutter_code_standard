@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
+import '../examples/background_foreground_example.dart';
+import '../examples/background_refetch_example.dart';
+import '../examples/lifecycle_aware_example.dart';
+import '../examples/window_focus_example.dart';
 import '../providers/user_providers.dart';
 import '../models/user.dart';
 import 'user_detail_screen.dart';
@@ -9,11 +13,6 @@ import 'posts_screen.dart';
 import 'user_search_screen.dart';
 import 'provider_comparison_screen.dart';
 import 'cache_debug_screen.dart';
-import 'annotated_example_screen.dart';
-import 'riverpod_annotated_demo_screen.dart';
-import 'smart_payroll_demo.dart';
-import 'payroll_hooks_example.dart';
-import 'hooks_comparison.dart';
 import 'smart_cache_examples.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -22,7 +21,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 10,
+      length: 9,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Query Provider Example'),
@@ -47,12 +46,11 @@ class HomeScreen extends ConsumerWidget {
               Tab(text: 'Posts', icon: Icon(Icons.article)),
               Tab(text: 'Search', icon: Icon(Icons.search)),
               Tab(text: 'Mutations', icon: Icon(Icons.edit)),
-              Tab(text: 'Utils示例', icon: Icon(Icons.extension)),
-              Tab(text: '@riverpod示例', icon: Icon(Icons.code)),
-              Tab(text: 'Smart Cache', icon: Icon(Icons.rocket_launch)),
-              Tab(text: 'Cache示例', icon: Icon(Icons.memory)),
-              Tab(text: 'Hooks示例', icon: Icon(Icons.interests)),
-              Tab(text: 'Hooks对比', icon: Icon(Icons.compare_arrows)),
+              Tab(text: 'BackgroundRefetchExample', icon: Icon(Icons.code)),
+              Tab(text: 'BackgroundForegroundExample', icon: Icon(Icons.code)),
+              Tab(text: 'LifecycleAwareExample', icon: Icon(Icons.code)),
+              Tab(text: 'WindowFocusExample', icon: Icon(Icons.code)),
+              Tab(text: 'SmartCacheComparisonExample', icon: Icon(Icons.abc)),
             ],
           ),
         ),
@@ -62,12 +60,11 @@ class HomeScreen extends ConsumerWidget {
             PostsTab(),
             SearchTab(),
             MutationsTab(),
-            AnnotatedExampleScreen(),
-            RiverpodAnnotatedDemoScreen(),
-            SmartPayrollDemo(),
+            BackgroundRefetchExample(),
+            BackgroundForegroundExample(),
+            LifecycleAwareExample(),
+            WindowFocusExample(),
             SmartCacheComparisonScreen(),
-            PayrollHooksExample(),
-            HooksComparison(),
           ],
         ),
       ),
