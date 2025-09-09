@@ -147,8 +147,8 @@ class AsyncQueryNotifier<T> extends AsyncNotifier<T> with QueryClientMixin {
 
   /// Set up cache change listener
   void _setupCacheListener() {
-    _cache.addListener<T>(queryKey, (entry) {
-      if (entry?.hasData == true) {
+    _cache.addListener<T>(queryKey, (QueryCacheEntry<T>? entry) {
+      if (entry?.hasData??false) {
         state = AsyncValue.data(entry!.data as T);
       }
     });
@@ -375,6 +375,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
 
   /// Fetch data
   Future<void> _fetch() async {
+    debugPrint('Fetching data in query notifier');
     if (!options.enabled) {
       return;
     }
@@ -498,6 +499,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
   }
 
   void _onAppResume() {
+    debugPrint('App resumed in query notifier');
     // Resume refetching and check if we need to refetch stale data
     _isRefetchPaused = false;
     
@@ -508,6 +510,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
   }
 
   void _onAppPause() {
+    debugPrint('App paused in query notifier');
     // Mark refetching as paused
     _isRefetchPaused = true;
   }
@@ -521,6 +524,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
   }
 
   void _onWindowFocus() {
+    debugPrint('Window focused in query notifier');
     // Refetch stale data when window gains focus
     final cachedEntry = _getCachedEntry();
     if (cachedEntry != null && cachedEntry.isStale && options.enabled) {
@@ -541,7 +545,7 @@ class QueryNotifier<T> extends StateNotifier<QueryState<T>>
   /// Set up cache change listener for automatic UI updates
   void _setupCacheListener() {
     _cache.addListener<T>(queryKey, (entry) {
-      print('Cache listener called for key $queryKey in query notifier');
+      debugPrint('Cache listener called for key $queryKey in query notifier');
       if (entry?.hasData ?? false) {
         // Update state when cache data changes externally (e.g., optimistic updates)
         state = QuerySuccess(entry!.data as T, fetchedAt: entry.fetchedAt);

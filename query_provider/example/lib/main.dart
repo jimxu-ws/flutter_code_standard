@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'examples/window_focus_example.dart';
 import 'screens/home_screen.dart';
 
 void main() {
   runApp(
     // Use ProviderScope to ensure all providers share the same container
     // This is critical for QueryClient to properly invalidate providers
-    const ProviderScope(
-      child: MyApp(),
-    ),
+    // const ProviderScope(
+    //   child: MyApp(),
+    // ),
+    const WindowFocusDemo(),
   );
 }
 

@@ -33,7 +33,9 @@ class WindowFocusManager extends ChangeNotifier {
   bool get isSupported => kIsWeb || Platform.isWindows || Platform.isMacOS || Platform.isLinux;
   
   void _initialize() {
-    if (!isSupported) return;
+    if (!isSupported) {
+      return;
+    }
     
     // Listen to window focus events
     _setupFocusListener();
@@ -144,9 +146,9 @@ class WindowFocusManager extends ChangeNotifier {
 
 /// Observer for desktop focus detection
 class _DesktopFocusObserver with WidgetsBindingObserver {
-  final WindowFocusManager _manager;
   
   _DesktopFocusObserver(this._manager);
+  final WindowFocusManager _manager;
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

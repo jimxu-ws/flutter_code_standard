@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:meta/meta.dart';
 
@@ -419,7 +420,7 @@ class InfiniteQueryNotifier<T, TPageParam> extends StateNotifier<InfiniteQuerySt
   /// Set up cache change listener for automatic UI updates
   void _setupCacheListener() {
     getGlobalQueryCache().addListener<List<T>>(queryKey, (entry) {
-      print('Cache listener called for key $queryKey in infinite query notifier');
+      debugPrint('Cache listener called for key $queryKey in infinite query notifier');
       if (entry?.hasData ?? false) {
         // Update state when cache data changes externally (e.g., optimistic updates)
         final pages = entry!.data!;
