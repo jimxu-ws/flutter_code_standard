@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
@@ -6,10 +7,6 @@ import '../services/api_service.dart';
 
 /// 🎯 SmartCachedFetcher 示例 - 使用 StateNotifier (推荐方式)
 class UserProfileNotifier extends StateNotifier<AsyncValue<User?>> {
-  final Ref ref;
-  final int userId;
-  // 🔥 SmartCachedFetcher - 智能缓存获取器
-  late final SmartCachedFetcher<User> _userFetcher;
   
   UserProfileNotifier(this.ref, this.userId) : super(const AsyncValue.loading()) {
     // 🚀 初始化智能缓存获取器
@@ -44,6 +41,10 @@ class UserProfileNotifier extends StateNotifier<AsyncValue<User?>> {
     // 🎯 初始化时检查缓存
     _initializeFromCache();
   }
+  final Ref ref;
+  final int userId;
+  // 🔥 SmartCachedFetcher - 智能缓存获取器
+  late final SmartCachedFetcher<User> _userFetcher;
   
   /// 从缓存初始化状态
   void _initializeFromCache() {
@@ -86,12 +87,11 @@ final userProfileProvider = StateNotifierProvider.family<UserProfileNotifier, As
 
 /// 🎯 SmartCachedFetcher 示例页面
 class SmartCachedFetcherExample extends ConsumerWidget {
-  final int userId;
   
   const SmartCachedFetcherExample({
-    super.key,
-    required this.userId,
+    required this.userId, super.key,
   });
+  final int userId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -196,7 +196,7 @@ class SmartCachedFetcherExample extends ConsumerWidget {
                           Text('加载失败: $error'),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: () => userNotifier.fetchUser(),
+                            onPressed: userNotifier.fetchUser,
                             child: const Text('重试'),
                           ),
                         ],
@@ -214,7 +214,7 @@ class SmartCachedFetcherExample extends ConsumerWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userNotifier.fetchUser(),
+                    onPressed: userNotifier.fetchUser,
                     icon: const Icon(Icons.download),
                     label: const Text('获取数据'),
                   ),
@@ -222,7 +222,7 @@ class SmartCachedFetcherExample extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userNotifier.refreshUser(),
+                    onPressed: userNotifier.refreshUser,
                     icon: const Icon(Icons.refresh),
                     label: const Text('强制刷新'),
                   ),
@@ -230,7 +230,7 @@ class SmartCachedFetcherExample extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userNotifier.clearCache(),
+                    onPressed: userNotifier.clearCache,
                     icon: const Icon(Icons.clear),
                     label: const Text('清除缓存'),
                     style: ElevatedButton.styleFrom(
@@ -245,16 +245,21 @@ class SmartCachedFetcherExample extends ConsumerWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IntProperty('userId', userId));
+  }
 }
 
 /// 🎯 useSmartQuery Hook 示例页面
 class UseSmartQueryExample extends HookConsumerWidget {
-  final int userId;
   
   const UseSmartQueryExample({
-    super.key,
-    required this.userId,
+    required this.userId, super.key,
   });
+  final int userId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -382,7 +387,7 @@ class UseSmartQueryExample extends HookConsumerWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userQuery.refetch(),
+                    onPressed: userQuery.refetch,
                     icon: const Icon(Icons.download),
                     label: const Text('获取数据'),
                   ),
@@ -390,7 +395,7 @@ class UseSmartQueryExample extends HookConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userQuery.refresh(),
+                    onPressed: userQuery.refresh,
                     icon: const Icon(Icons.refresh),
                     label: const Text('强制刷新'),
                   ),
@@ -398,7 +403,7 @@ class UseSmartQueryExample extends HookConsumerWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => userQuery.clearCache(),
+                    onPressed: userQuery.clearCache,
                     icon: const Icon(Icons.clear),
                     label: const Text('清除缓存'),
                     style: ElevatedButton.styleFrom(
@@ -412,6 +417,12 @@ class UseSmartQueryExample extends HookConsumerWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IntProperty('userId', userId));
   }
 }
 

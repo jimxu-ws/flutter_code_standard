@@ -4,16 +4,16 @@ import 'package:query_provider/query_provider.dart';
 
 void main() {
   group('AppLifecycleManager', () {
-    late AppLifecycleManager manager;
+    late AppFocusManager manager;
 
     setUp(() {
       // Create a fresh instance for each test
-      manager = AppLifecycleManager.instance;
+      manager = AppFocusManager();
     });
 
     test('should be a singleton', () {
-      final manager1 = AppLifecycleManager.instance;
-      final manager2 = AppLifecycleManager.instance;
+      final manager1 = AppFocusManager();
+      final manager2 = AppFocusManager();
       
       expect(identical(manager1, manager2), true);
     });
@@ -112,39 +112,6 @@ void main() {
       expect(callbackCalled, false);
     });
 
-    test('should handle window focus callbacks', () {
-      var focusCallbackCalled = false;
-      var blurCallbackCalled = false;
-      
-      manager.addOnWindowFocusCallback(() {
-        focusCallbackCalled = true;
-      });
-      
-      manager.addOnWindowBlurCallback(() {
-        blurCallbackCalled = true;
-      });
-      
-      // Simulate window focus change (this would normally be called internally)
-      // Since _handleWindowFocusChange is private, we test through lifecycle changes
-      // which can trigger similar behavior on desktop platforms
-      
-      expect(focusCallbackCalled, false);
-      expect(blurCallbackCalled, false);
-    });
-
-    test('should remove window focus callbacks correctly', () {
-      var focusCallbackCalled = false;
-      
-      void focusCallback() {
-        focusCallbackCalled = true;
-      }
-      
-      manager.addOnWindowFocusCallback(focusCallback);
-      manager.removeOnWindowFocusCallback(focusCallback);
-      
-      // Even if focus changes, callback shouldn't be called
-      expect(focusCallbackCalled, false);
-    });
 
     test('should handle callback errors gracefully', () {
       var goodCallbackCalled = false;

@@ -5,7 +5,7 @@ import 'package:query_provider/query_provider.dart';
 // Mock API service
 class NewsService {
   static Future<List<String>> getLatestNews() async {
-    await Future.delayed(const Duration(seconds: 1));
+    await Future<void>.delayed(const Duration(seconds: 1));
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     return [
       'Breaking: News story ${timestamp % 1000}',
@@ -18,7 +18,7 @@ class NewsService {
 // Query provider with background refetching
 final newsProvider = queryProvider<List<String>>(
   name: 'latest-news',
-  queryFn: NewsService.getLatestNews,
+  queryFn: (ref) => NewsService.getLatestNews(),
   options: const QueryOptions(
     // 🔄 Background refetch every 30 seconds
     refetchInterval: Duration(seconds: 30),

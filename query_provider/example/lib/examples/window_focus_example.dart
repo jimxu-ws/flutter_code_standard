@@ -5,11 +5,11 @@ import 'package:query_provider/query_provider.dart';
 // Mock API service for desktop/web data
 class DesktopDataService {
   static int _updateCounter = 0;
-  
+
   static Future<Map<String, dynamic>> getSystemInfo() async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 600));
     _updateCounter++;
-    
+
     return {
       'cpu_usage': '${45 + (_updateCounter * 3) % 40}%',
       'memory_usage': '${60 + (_updateCounter * 5) % 30}%',
@@ -19,11 +19,11 @@ class DesktopDataService {
       'update_count': _updateCounter,
     };
   }
-  
+
   static Future<List<Map<String, dynamic>>> getActiveProcesses() async {
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    
+
     return [
       {
         'name': 'Chrome',
@@ -50,23 +50,20 @@ class DesktopDataService {
 // 🖥️ System info query with window focus refetching
 final systemInfoProvider = queryProvider<Map<String, dynamic>>(
   name: 'system-info',
-  queryFn: DesktopDataService.getSystemInfo,
+  queryFn: (ref) => DesktopDataService.getSystemInfo(),
   options: const QueryOptions(
     // ⏰ Regular updates every 15 seconds
     refetchInterval: Duration(seconds: 15),
-    
+
     // 🔄 Refetch when window gains focus (great for desktop apps)
     refetchOnWindowFocus: true,
-    
-    // 📱 Also refetch on app focus (mobile compatibility)
-    refetchOnAppFocus: true,
-    
+
     // ⏸️ Pause when app/window loses focus
     pauseRefetchInBackground: true,
-    
+
     // 📊 Data is stale after 10 seconds
     staleTime: Duration(seconds: 10),
-    
+
     keepPreviousData: true,
   ),
 );
@@ -74,17 +71,17 @@ final systemInfoProvider = queryProvider<Map<String, dynamic>>(
 // 📊 Process list query
 final processListProvider = queryProvider<List<Map<String, dynamic>>>(
   name: 'process-list',
-  queryFn: DesktopDataService.getActiveProcesses,
+  queryFn: (ref) => DesktopDataService.getActiveProcesses(),
   options: const QueryOptions(
     // ⚡ Frequent updates for real-time monitoring
     refetchInterval: Duration(seconds: 5),
-    
+
     // 🔄 Immediate refresh when window gains focus
     refetchOnWindowFocus: true,
-    
+
     // ⏸️ Stop monitoring when not focused
     pauseRefetchInBackground: true,
-    
+
     staleTime: Duration(seconds: 3),
     keepPreviousData: true,
   ),
@@ -135,20 +132,21 @@ class WindowFocusExample extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Window focus status
-            _buildFocusStatusCard(windowHasFocus, windowFocusSupported, appState),
-            
+            _buildFocusStatusCard(
+                windowHasFocus, windowFocusSupported, appState),
+
             const SizedBox(height: 16),
-            
+
             // System information
             _buildSystemInfoCard(systemInfo),
-            
+
             const SizedBox(height: 16),
-            
+
             // Process list
             _buildProcessListCard(processList),
-            
+
             const SizedBox(height: 16),
-            
+
             // Instructions
             _buildInstructionsCard(),
           ],
@@ -159,13 +157,14 @@ class WindowFocusExample extends ConsumerWidget {
           // Manual focus simulation for testing
           ref.read(windowFocusManagerProvider).setWindowFocus(!windowHasFocus);
         },
-        child: Icon(windowHasFocus ? Icons.visibility_off : Icons.visibility),
         tooltip: 'Toggle Focus (for testing)',
+        child: Icon(windowHasFocus ? Icons.visibility_off : Icons.visibility),
       ),
     );
   }
 
-  Widget _buildFocusStatusCard(bool windowHasFocus, bool supported, AppLifecycleState appState) {
+  Widget _buildFocusStatusCard(
+      bool windowHasFocus, bool supported, AppLifecycleState appState) {
     return Card(
       color: windowHasFocus ? Colors.blue[50] : Colors.grey[50],
       child: Padding(
@@ -176,13 +175,15 @@ class WindowFocusExample extends ConsumerWidget {
             Row(
               children: [
                 Icon(
-                  windowHasFocus ? Icons.desktop_windows : Icons.desktop_access_disabled,
+                  windowHasFocus
+                      ? Icons.desktop_windows
+                      : Icons.desktop_access_disabled,
                   color: windowHasFocus ? Colors.blue : Colors.grey,
                 ),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'Window Focus Status',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -190,14 +191,19 @@ class WindowFocusExample extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildStatusRow('Window Focus', windowHasFocus ? 'FOCUSED' : 'UNFOCUSED', 
+            _buildStatusRow(
+                'Window Focus',
+                windowHasFocus ? 'FOCUSED' : 'UNFOCUSED',
                 windowHasFocus ? Colors.green : Colors.orange),
-            _buildStatusRow('App Lifecycle', appState.name.toUpperCase(), Colors.blue),
-            _buildStatusRow('Platform Support', supported ? 'SUPPORTED' : 'NOT SUPPORTED', 
+            _buildStatusRow(
+                'App Lifecycle', appState.name.toUpperCase(), Colors.blue),
+            _buildStatusRow(
+                'Platform Support',
+                supported ? 'SUPPORTED' : 'NOT SUPPORTED',
                 supported ? Colors.green : Colors.red),
             const SizedBox(height: 8),
             Text(
-              windowHasFocus 
+              windowHasFocus
                   ? '🔄 Queries are actively refetching'
                   : '⏸️ Refetching paused (window not focused)',
               style: TextStyle(
@@ -241,12 +247,15 @@ class WindowFocusExample extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             systemInfo.when(
-              idle: () => const Text('Ready to load system info'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (data) => _buildSystemInfoContent(data),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousData) => _buildSystemInfoContent(previousData),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load system info'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildSystemInfoContent,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildSystemInfoContent,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⏰ Updates every 15 seconds • 🔄 Refetches on window focus',
@@ -266,17 +275,25 @@ class WindowFocusExample extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Expanded(child: _buildMetricCard('CPU', data['cpu_usage'], Colors.red)),
+            Expanded(
+                child: _buildMetricCard(
+                    'CPU', data['cpu_usage'] as String, Colors.red)),
             const SizedBox(width: 8),
-            Expanded(child: _buildMetricCard('Memory', data['memory_usage'], Colors.orange)),
+            Expanded(
+                child: _buildMetricCard(
+                    'Memory', data['memory_usage'] as String, Colors.orange)),
           ],
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Expanded(child: _buildMetricCard('Disk', data['disk_usage'], Colors.blue)),
+            Expanded(
+                child: _buildMetricCard(
+                    'Disk', data['disk_usage'] as String, Colors.blue)),
             const SizedBox(width: 8),
-            Expanded(child: _buildMetricCard('Network', data['network_activity'], Colors.green)),
+            Expanded(
+                child: _buildMetricCard('Network',
+                    data['network_activity'] as String, Colors.green)),
           ],
         ),
         const SizedBox(height: 8),
@@ -295,9 +312,9 @@ class WindowFocusExample extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -323,7 +340,8 @@ class WindowFocusExample extends ConsumerWidget {
     );
   }
 
-  Widget _buildProcessListCard(QueryState<List<Map<String, dynamic>>> processList) {
+  Widget _buildProcessListCard(
+      QueryState<List<Map<String, dynamic>>> processList) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -352,12 +370,15 @@ class WindowFocusExample extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             processList.when(
-              idle: () => const Text('Ready to load processes'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (data) => _buildProcessList(data),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousData) => _buildProcessList(previousData),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load processes'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildProcessList,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildProcessList,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⚡ Updates every 5 seconds • 🔄 Real-time when focused',
@@ -388,7 +409,7 @@ class WindowFocusExample extends ConsumerWidget {
               Expanded(
                 flex: 2,
                 child: Text(
-                  process['name'],
+                  process['name'] as String,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -423,7 +444,7 @@ class WindowFocusExample extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
-import '../models/user.dart';
 import '../models/post.dart';
+import '../models/user.dart';
 
 /// Mock API service that simulates network requests
 class ApiService {
@@ -15,7 +15,7 @@ class ApiService {
     final delay = _baseDelay + Duration(
       milliseconds: _random.nextInt(_maxDelay.inMilliseconds - _baseDelay.inMilliseconds),
     );
-    await Future.delayed(delay);
+    await Future<void>.delayed(delay);
   }
 
   /// Simulate random failures (10% chance)
@@ -113,13 +113,15 @@ class ApiService {
     _maybeThrow();
 
     final startIndex = (page - 1) * limit;
-    final totalPosts = 100; // Simulate 100 total posts
+    const totalPosts = 100; // Simulate 100 total posts
     
     final posts = List.generate(
       limit,
       (index) {
         final postId = startIndex + index + 1;
-        if (postId > totalPosts) return null;
+        if (postId > totalPosts) {
+          return null;
+        }
         
         return Post(
           id: postId,
@@ -153,6 +155,41 @@ class ApiService {
         userId: userId,
       );
     });
+  }
+
+  /// Fetch posts by user ID with pagination
+  static Future<PostPage> fetchUserPostsPaginated(int userId, {int page = 1, int limit = 10}) async {
+    await _delay();
+    _maybeThrow();
+
+    final startIndex = (page - 1) * limit;
+    const totalUserPosts = 25; // Simulate 25 total posts per user
+    
+    final posts = List.generate(
+      limit,
+      (index) {
+        final postIndex = startIndex + index + 1;
+        if (postIndex > totalUserPosts) {
+          return null;
+        }
+        
+        final postId = (userId * 100) + postIndex;
+        return Post(
+          id: postId,
+          title: 'User $userId Post $postIndex',
+          body: 'This is post $postIndex by user $userId. It contains detailed information about their thoughts and experiences.',
+          userId: userId,
+        );
+      },
+    ).where((post) => post != null).cast<Post>().toList();
+
+    final hasMore = startIndex + limit < totalUserPosts;
+
+    return PostPage(
+      posts: posts,
+      page: page,
+      hasMore: hasMore,
+    );
   }
 
   /// Create a new post

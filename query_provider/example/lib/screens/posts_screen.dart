@@ -1,16 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
-import '../providers/post_providers.dart';
 import '../models/post.dart';
+import '../providers/post_providers.dart';
 
 class PostsScreen extends ConsumerWidget {
   const PostsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final infiniteQuery = postsInfiniteQueryProvider.use(ref);
+    final infiniteQuery = ref.readInfiniteQueryResult(postsInfiniteQueryProvider);//postsInfiniteQueryProvider.use(ref);
 
     return infiniteQuery.state.when(
       idle: () => const Center(child: Text('Loading posts...')),
@@ -22,6 +23,13 @@ class PostsScreen extends ConsumerWidget {
         onLoadMore: infiniteQuery.fetchNextPage,
         onRefresh: infiniteQuery.refetch,
       ),
+      refetching: (pages, hasNextPage, hasPreviousPage, fetchedAt) => PostsList(
+            pages: pages,
+            hasNextPage: hasNextPage,
+            isFetchingNextPage: infiniteQuery.isFetchingNextPage,
+            onLoadMore: infiniteQuery.fetchNextPage,
+            onRefresh: infiniteQuery.refetch,
+          ),
       error: (error, stackTrace) => ErrorView(
         error: error,
         onRetry: infiniteQuery.refetch,
@@ -44,14 +52,9 @@ class PostsScreen extends ConsumerWidget {
   }
 }
 
-class PostsList extends StatelessWidget {
+class PostsList extends StatefulWidget {
   const PostsList({
-    super.key,
-    required this.pages,
-    required this.hasNextPage,
-    required this.isFetchingNextPage,
-    required this.onLoadMore,
-    required this.onRefresh,
+    required this.pages, required this.hasNextPage, required this.isFetchingNextPage, required this.onLoadMore, required this.onRefresh, super.key,
   });
 
   final List<PostPage> pages;
@@ -61,20 +64,77 @@ class PostsList extends StatelessWidget {
   final Future<void> Function() onRefresh;
 
   @override
+  State<PostsList> createState() => _PostsListState();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IterableProperty<PostPage>('pages', pages));
+    properties.add(DiagnosticsProperty<bool>('hasNextPage', hasNextPage));
+    properties.add(DiagnosticsProperty<bool>('isFetchingNextPage', isFetchingNextPage));
+    properties.add(ObjectFlagProperty<Future<void> Function()>.has('onLoadMore', onLoadMore));
+    properties.add(ObjectFlagProperty<Future<void> Function()>.has('onRefresh', onRefresh));
+  }
+}
+
+class _PostsListState extends State<PostsList> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more when user is 200 pixels from the bottom
+      _loadMoreIfNeeded();
+    }
+  }
+
+  Future<void> _loadMoreIfNeeded() async {
+    if (widget.hasNextPage && !widget.isFetchingNextPage && !_isLoadingMore) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+      
+      try {
+        await widget.onLoadMore();
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoadingMore = false;
+          });
+        }
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Flatten all posts from all pages
-    final allPosts = pages.expand((page) => page.posts).toList();
+    final allPosts = widget.pages.expand((page) => page.posts).toList();
 
     return RefreshIndicator(
-      onRefresh: onRefresh,
+      onRefresh: widget.onRefresh,
       child: ListView.builder(
-        itemCount: allPosts.length + (hasNextPage ? 1 : 0),
+        controller: _scrollController,
+        itemCount: allPosts.length + (widget.hasNextPage || widget.isFetchingNextPage ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == allPosts.length) {
-            // Load more indicator
-            return LoadMoreIndicator(
-              isLoading: isFetchingNextPage,
-              onLoadMore: onLoadMore,
+            // Auto-loading indicator
+            return AutoLoadingIndicator(
+              isLoading: widget.isFetchingNextPage || _isLoadingMore,
             );
           }
 
@@ -87,7 +147,7 @@ class PostsList extends StatelessWidget {
 }
 
 class PostListTile extends StatelessWidget {
-  const PostListTile({super.key, required this.post});
+  const PostListTile({required this.post, super.key});
 
   final Post post;
 
@@ -130,7 +190,7 @@ class PostListTile extends StatelessWidget {
   }
 
   void _showPostDetails(BuildContext context, Post post) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(post.title),
@@ -167,46 +227,58 @@ class PostListTile extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Post>('post', post));
+  }
 }
 
-class LoadMoreIndicator extends StatelessWidget {
-  const LoadMoreIndicator({
-    super.key,
-    required this.isLoading,
-    required this.onLoadMore,
+class AutoLoadingIndicator extends StatelessWidget {
+  const AutoLoadingIndicator({
+    required this.isLoading, super.key,
   });
 
   final bool isLoading;
-  final Future<void> Function() onLoadMore;
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+    if (!isLoading) {
+      // Return a small invisible widget when not loading
+      return const SizedBox(height: 16);
     }
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return const Padding(
+      padding: EdgeInsets.all(16.0),
       child: Center(
-        child: ElevatedButton(
-          onPressed: onLoadMore,
-          child: const Text('Load More'),
+        child: Column(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 8),
+            Text(
+              'Loading more posts...',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<bool>('isLoading', isLoading));
   }
 }
 
 class ErrorView extends StatelessWidget {
   const ErrorView({
-    super.key,
-    required this.error,
-    required this.onRetry,
+    required this.error, required this.onRetry, super.key,
   });
 
   final Object error;
@@ -246,25 +318,11 @@ class ErrorView extends StatelessWidget {
       ),
     );
   }
-}
 
-// Extension to handle infinite query state more elegantly
-extension InfiniteQueryStateExtension<T> on InfiniteQueryState<T> {
-  R when<R>({
-    required R Function() idle,
-    required R Function() loading,
-    required R Function(List<T> pages, bool hasNextPage, bool hasPreviousPage, DateTime? fetchedAt) success,
-    required R Function(Object error, StackTrace? stackTrace) error,
-    required R Function(List<T> pages, bool hasNextPage, bool hasPreviousPage, DateTime? fetchedAt) fetchingNextPage,
-    required R Function(List<T> pages, bool hasNextPage, bool hasPreviousPage, DateTime? fetchedAt) fetchingPreviousPage,
-  }) {
-    return switch (this) {
-      InfiniteQueryIdle<T>() => idle(),
-      InfiniteQueryLoading<T>() => loading(),
-      InfiniteQuerySuccess<T> successState => success(successState.pages, successState.hasNextPage, successState.hasPreviousPage, successState.fetchedAt),
-      InfiniteQueryError<T> errorState => error(errorState.error, errorState.stackTrace),
-      InfiniteQueryFetchingNextPage<T> fetching => fetchingNextPage(fetching.pages, fetching.hasNextPage, fetching.hasPreviousPage, fetching.fetchedAt),
-      InfiniteQueryFetchingPreviousPage<T> fetching => fetchingPreviousPage(fetching.pages, fetching.hasNextPage, fetching.hasPreviousPage, fetching.fetchedAt),
-    };
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Object>('error', error));
+    properties.add(ObjectFlagProperty<Future<void> Function()>.has('onRetry', onRetry));
   }
 }

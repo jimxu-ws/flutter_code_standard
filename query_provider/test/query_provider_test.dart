@@ -1,38 +1,37 @@
-import 'dart:async';
-
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:query_provider/query_provider.dart';
+import 'package:query_provider/src/cache/memory_cache.dart';
 
 // Mock data and functions for testing
 class MockApiService {
   static int callCount = 0;
   static bool shouldFail = false;
   static Duration delay = const Duration(milliseconds: 100);
-  
+
   static Future<String> fetchData() async {
-    await Future.delayed(delay);
+    await Future.delayed(delay, () => null);
     callCount++;
-    
+
     if (shouldFail) {
       throw Exception('Mock API error');
     }
-    
+
     return 'Mock data $callCount';
   }
-  
+
   static Future<String> fetchDataWithParam(String param) async {
-    await Future.delayed(delay);
+    await Future.delayed(delay, () => null);
     callCount++;
-    
+
     if (shouldFail) {
       throw Exception('Mock API error with param: $param');
     }
-    
+
     return 'Mock data for $param - $callCount';
   }
-  
+
   static void reset() {
     callCount = 0;
     shouldFail = false;
@@ -43,14 +42,14 @@ class MockApiService {
 void main() {
   group('QueryNotifier', () {
     late ProviderContainer container;
-    
+
     setUp(() {
       MockApiService.reset();
       container = ProviderContainer();
       // Clear global cache
-      getGlobalQueryCache().clear();
+      MemoryQueryCache().clear();
     });
-    
+
     tearDown(() {
       container.dispose();
     });
@@ -58,9 +57,9 @@ void main() {
     test('should start in idle state', () {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
       );
-      
+
       final state = container.read(provider);
       expect(state, isA<QueryIdle<String>>());
       expect(state.isIdle, true);
@@ -70,35 +69,36 @@ void main() {
     test('should fetch data on mount when refetchOnMount is true', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for async operation
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, 'Mock data 1');
       expect(MockApiService.callCount, 1);
     });
 
-    test('should not fetch data on mount when refetchOnMount is false', () async {
+    test('should not fetch data on mount when refetchOnMount is false',
+        () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: false),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait a bit
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QueryIdle<String>>());
       expect(MockApiService.callCount, 0);
@@ -106,106 +106,107 @@ void main() {
 
     test('should handle loading state correctly', () async {
       MockApiService.delay = const Duration(milliseconds: 200);
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       final states = <QueryState<String>>[];
       container.listen(provider, (previous, next) {
         states.add(next);
       });
-      
+
       // Wait for loading state
-      await Future.delayed(const Duration(milliseconds: 50));
-      
+      await Future.delayed(const Duration(milliseconds: 50), () => null);
+
       expect(states.isNotEmpty, true);
       expect(states.first, isA<QueryLoading<String>>());
-      
+
       // Wait for completion
-      await Future.delayed(const Duration(milliseconds: 200));
-      
+      await Future.delayed(const Duration(milliseconds: 200), () => null);
+
       expect(states.last, isA<QuerySuccess<String>>());
     });
 
     test('should handle error state correctly', () async {
       MockApiService.shouldFail = true;
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for async operation
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QueryError<String>>());
-      expect((state as QueryError<String>).error.toString(), contains('Mock API error'));
+      expect((state as QueryError<String>).error.toString(),
+          contains('Mock API error'));
     });
 
     test('should retry on failure', () async {
       MockApiService.shouldFail = true;
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(
           refetchOnMount: true,
           retry: 2,
           retryDelay: Duration(milliseconds: 50),
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for retries to complete
-      await Future.delayed(const Duration(milliseconds: 300));
-      
+      await Future.delayed(const Duration(milliseconds: 300), () => null);
+
       // Should have called 3 times (initial + 2 retries)
       expect(MockApiService.callCount, 3);
-      
+
       final state = container.read(provider);
       expect(state, isA<QueryError<String>>());
     });
 
     test('should succeed after retry', () async {
       var failCount = 0;
-      
+
       Future<String> flakyFetch() async {
-        await Future.delayed(const Duration(milliseconds: 50));
+        await Future.delayed(const Duration(milliseconds: 50), () => null);
         failCount++;
-        
+
         if (failCount <= 2) {
           throw Exception('Temporary failure');
         }
-        
+
         return 'Success after retries';
       }
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: flakyFetch,
+        queryFn: (ref) => flakyFetch(),
         options: const QueryOptions(
           refetchOnMount: true,
           retry: 3,
           retryDelay: Duration(milliseconds: 10),
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for retries to complete
-      await Future.delayed(const Duration(milliseconds: 200));
-      
+      await Future.delayed(const Duration(milliseconds: 200), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, 'Success after retries');
@@ -215,23 +216,23 @@ void main() {
     test('should refetch manually', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for initial fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(MockApiService.callCount, 1);
-      
+
       // Manual refetch
       await container.read(provider.notifier).refetch();
-      
+
       expect(MockApiService.callCount, 2);
-      
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, 'Mock data 2');
@@ -240,27 +241,27 @@ void main() {
     test('should invalidate and refetch', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for initial fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(MockApiService.callCount, 1);
-      
+
       // Check cache has data
-      final cache = getGlobalQueryCache();
+      final cache = MemoryQueryCache();
       expect(cache.get<String>('test-query'), isNotNull);
-      
+
       // Invalidate
-      await container.read(provider.notifier).invalidate();
-      
+      await container.read(provider.notifier).refresh();
+
       expect(MockApiService.callCount, 2);
-      
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
     });
@@ -268,16 +269,16 @@ void main() {
     test('should set data manually', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: false),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Set data manually
       container.read(provider.notifier).setData('Manual data');
-      
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, 'Manual data');
@@ -287,16 +288,16 @@ void main() {
     test('should get cached data', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for initial fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final cachedData = container.read(provider.notifier).getCachedData();
       expect(cachedData, 'Mock data 1');
     });
@@ -304,19 +305,19 @@ void main() {
     test('should handle disabled query', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(
           refetchOnMount: true,
           enabled: false,
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait a bit
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QueryIdle<String>>());
       expect(MockApiService.callCount, 0);
@@ -325,27 +326,26 @@ void main() {
     test('should use cached data when available and fresh', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(
-          refetchOnMount: true,
-          staleTime: Duration(minutes: 5),
+          staleTime: Duration(minutes: 6),
         ),
       );
-      
+
       // First fetch
       container.listen(provider, (previous, next) {});
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(MockApiService.callCount, 1);
-      
+
       // Create new container (simulating app restart)
       container.dispose();
       container = ProviderContainer();
-      
+
       // Second fetch should use cache
       container.listen(provider, (previous, next) {});
-      await Future.delayed(const Duration(milliseconds: 50));
-      
+      await Future.delayed(const Duration(milliseconds: 50), () => null);
+
       final state = container.read(provider);
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, 'Mock data 1');
@@ -355,39 +355,39 @@ void main() {
     test('should show refetching state with keepPreviousData', () async {
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(
           refetchOnMount: true,
           keepPreviousData: true,
           staleTime: Duration.zero, // Always stale
         ),
       );
-      
+
       final states = <QueryState<String>>[];
       container.listen(provider, (previous, next) {
         states.add(next);
       });
-      
+
       // Wait for initial fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       // Trigger refetch
       await container.read(provider.notifier).refetch();
-      
+
       // Should have refetching state
       final refetchingStates = states.whereType<QueryRefetching<String>>();
       expect(refetchingStates.isNotEmpty, true);
-      
+
       final refetchingState = refetchingStates.first;
       expect(refetchingState.previousData, 'Mock data 1');
     });
 
     test('should call success callback', () async {
       String? successData;
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: QueryOptions(
           refetchOnMount: true,
           onSuccess: (data) {
@@ -395,25 +395,25 @@ void main() {
           },
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(successData, 'Mock data 1');
     });
 
     test('should call error callback', () async {
       Object? errorReceived;
       StackTrace? stackTraceReceived;
-      
+
       MockApiService.shouldFail = true;
-      
+
       final provider = queryProvider<String>(
         name: 'test-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: QueryOptions(
           refetchOnMount: true,
           retry: 0, // No retries
@@ -423,13 +423,13 @@ void main() {
           },
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(errorReceived, isNotNull);
       expect(errorReceived.toString(), contains('Mock API error'));
       expect(stackTraceReceived, isNotNull);
@@ -438,34 +438,35 @@ void main() {
 
   group('queryProviderFamily', () {
     late ProviderContainer container;
-    
+
     setUp(() {
       MockApiService.reset();
       container = ProviderContainer();
-      getGlobalQueryCache().clear();
+      MemoryQueryCache().clear();
     });
-    
+
     tearDown(() {
       container.dispose();
     });
 
-    test('should create different instances for different parameters', () async {
-      final provider = queryProviderFamily<String, String>(
+    test('should create different instances for different parameters',
+        () async {
+      final provider = queryProviderWithParam<String, String>(
         name: 'user-query',
-        queryFn: MockApiService.fetchDataWithParam,
+        queryFn: (ref, param) => MockApiService.fetchDataWithParam(param),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to different parameters
       container.listen(provider('user1'), (previous, next) {});
       container.listen(provider('user2'), (previous, next) {});
-      
+
       // Wait for fetches
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state1 = container.read(provider('user1'));
       final state2 = container.read(provider('user2'));
-      
+
       expect(state1, isA<QuerySuccess<String>>());
       expect(state2, isA<QuerySuccess<String>>());
       expect((state1 as QuerySuccess<String>).data, contains('user1'));
@@ -474,39 +475,39 @@ void main() {
     });
 
     test('should reuse same instance for same parameter', () async {
-      final provider = queryProviderFamily<String, String>(
+      final provider = queryProviderWithParam<String, String>(
         name: 'user-query',
-        queryFn: MockApiService.fetchDataWithParam,
+        queryFn: (ref, param) => MockApiService.fetchDataWithParam(param),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to same parameter twice
       container.listen(provider('user1'), (previous, next) {});
       container.listen(provider('user1'), (previous, next) {});
-      
+
       // Wait for fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(MockApiService.callCount, 1); // Only one call
     });
 
     test('should handle different parameter types', () async {
-      final provider = queryProviderFamily<String, int>(
+      final provider = queryProviderWithParam<String, int>(
         name: 'id-query',
-        queryFn: (id) => MockApiService.fetchDataWithParam(id.toString()),
+        queryFn: (ref, id) => MockApiService.fetchDataWithParam(id.toString()),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to different IDs
       container.listen(provider(1), (previous, next) {});
       container.listen(provider(2), (previous, next) {});
-      
+
       // Wait for fetches
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       final state1 = container.read(provider(1));
       final state2 = container.read(provider(2));
-      
+
       expect(state1, isA<QuerySuccess<String>>());
       expect(state2, isA<QuerySuccess<String>>());
       expect((state1 as QuerySuccess<String>).data, contains('1'));
@@ -516,34 +517,33 @@ void main() {
 
   group('queryProviderWithParams', () {
     late ProviderContainer container;
-    
+
     setUp(() {
       MockApiService.reset();
       container = ProviderContainer();
-      getGlobalQueryCache().clear();
+      MemoryQueryCache().clear();
     });
-    
+
     tearDown(() {
       container.dispose();
     });
 
     test('should create provider with fixed parameters', () async {
       const params = 'fixed-param';
-      
-      final provider = queryProviderWithParams<String, String>(
+
+      final provider = queryProviderWithParam<String, String>(
         name: 'fixed-query',
-        params: params,
-        queryFn: MockApiService.fetchDataWithParam,
+        queryFn: (ref, param) => MockApiService.fetchDataWithParam(param),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
-      container.listen(provider, (previous, next) {});
-      
+      container.listen(provider(params), (previous, next) {});
+
       // Wait for fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
-      final state = container.read(provider);
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
+      final state = container.read(provider(params));
       expect(state, isA<QuerySuccess<String>>());
       expect((state as QuerySuccess<String>).data, contains('fixed-param'));
       expect(MockApiService.callCount, 1);
@@ -551,36 +551,38 @@ void main() {
 
     test('should include parameters in query key', () async {
       const params = 'test-param';
-      
-      final provider = queryProviderWithParams<String, String>(
+
+      final provider = queryProviderWithParam<String, String>(
         name: 'param-query',
-        params: params,
-        queryFn: MockApiService.fetchDataWithParam,
+        queryFn: (ref, param) => MockApiService.fetchDataWithParam(param),
         options: const QueryOptions(refetchOnMount: true),
       );
-      
+
       // Listen to trigger the provider
-      container.listen(provider, (previous, next) {});
-      
+      container.listen(provider(params), (previous, next) {});
+
       // Wait for fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       // Check cache key includes parameters
-      final cache = getGlobalQueryCache();
+      final cache = MemoryQueryCache();
       final keys = cache.keys;
-      expect(keys.any((key) => key.contains('param-query') && key.contains('test-param')), true);
+      expect(
+          keys.any((key) =>
+              key.contains('param-query') && key.contains('test-param')),
+          true);
     });
   });
 
   group('Lifecycle Integration', () {
     late ProviderContainer container;
-    
+
     setUp(() {
       MockApiService.reset();
       container = ProviderContainer();
-      getGlobalQueryCache().clear();
+      MemoryQueryCache().clear();
     });
-    
+
     tearDown(() {
       container.dispose();
     });
@@ -588,44 +590,47 @@ void main() {
     test('should handle app lifecycle changes', () async {
       final provider = queryProvider<String>(
         name: 'lifecycle-query',
-        queryFn: MockApiService.fetchData,
+        queryFn: (ref) => MockApiService.fetchData(),
         options: const QueryOptions(
           refetchOnMount: true,
-          refetchOnAppFocus: true,
+          refetchOnWindowFocus: true,
           pauseRefetchInBackground: true,
         ),
       );
-      
+
       // Listen to trigger the provider
       container.listen(provider, (previous, next) {});
-      
+
       // Wait for initial fetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       expect(MockApiService.callCount, 1);
-      
+
       // Simulate app going to background
-      final lifecycleManager = AppLifecycleManager.instance;
+      final lifecycleManager = AppFocusManager();
       lifecycleManager.didChangeAppLifecycleState(AppLifecycleState.paused);
-      
+
       // Simulate app coming back to foreground with stale data
       // First make data stale by manipulating cache
-      final cache = getGlobalQueryCache();
+      final cache = MemoryQueryCache();
       final entry = cache.get<String>('lifecycle-query');
       if (entry != null) {
+        const options = QueryOptions<String>(
+            staleTime: Duration(minutes: 5), cacheTime: Duration(minutes: 30));
         final staleEntry = QueryCacheEntry<String>(
           data: entry.data,
           fetchedAt: DateTime.now().subtract(const Duration(minutes: 10)),
-          options: const QueryOptions(staleTime: Duration(minutes: 5)),
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set('lifecycle-query', staleEntry);
       }
-      
+
       lifecycleManager.didChangeAppLifecycleState(AppLifecycleState.resumed);
-      
+
       // Wait for potential refetch
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      await Future.delayed(const Duration(milliseconds: 150), () => null);
+
       // Should have refetched due to stale data
       expect(MockApiService.callCount, 2);
     });

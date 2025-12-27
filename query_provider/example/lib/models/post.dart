@@ -9,11 +9,6 @@ class Post {
     required this.userId,
   });
 
-  final int id;
-  final String title;
-  final String body;
-  final int userId;
-
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
       id: json['id'] as int,
@@ -22,6 +17,11 @@ class Post {
       userId: json['userId'] as int,
     );
   }
+
+  final int id;
+  final String title;
+  final String body;
+  final int userId;
 
   Map<String, dynamic> toJson() {
     return {
@@ -70,10 +70,6 @@ class PostPage {
     required this.hasMore,
   });
 
-  final List<Post> posts;
-  final int page;
-  final bool hasMore;
-
   factory PostPage.fromJson(Map<String, dynamic> json) {
     return PostPage(
       posts: (json['posts'] as List<dynamic>)
@@ -83,6 +79,10 @@ class PostPage {
       hasMore: json['hasMore'] as bool,
     );
   }
+
+  final List<Post> posts;
+  final int page;
+  final bool hasMore;
 
   Map<String, dynamic> toJson() {
     return {

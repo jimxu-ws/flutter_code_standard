@@ -1,17 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../query_cache.dart';
-import '../query_client.dart';
-import '../query_options.dart';
-import '../query_state.dart';
-import '../mutation_options.dart';
-import '../query_provider.dart';
-import '../mutation_provider.dart';
+import '../cache/memory_cache.dart';
+import '../client/query_client.dart';
+import '../options/mutation_options.dart';
+import '../options/query_options.dart';
+import '../providers/modern_mutation_provider.dart';
+import '../providers/modern_query_provider.dart';
+import '../providers/query_state.dart';
+import '../providers/state_query_provider.dart';
 
 /// Utility functions for easier integration with @riverpod
 class QueryUtils {
   /// Create a query provider from a simple function
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// final usersProvider = QueryUtils.query<List<User>>(
@@ -20,18 +21,19 @@ class QueryUtils {
   ///   options: QueryOptions(staleTime: Duration(minutes: 5)),
   /// );
   /// ```
-  static StateNotifierProvider<QueryNotifier<T>, QueryState<T>> query<T>({
+  static NotifierProvider<QueryNotifier<T>, QueryState<T>> query<T>({
     required String name,
-    required Future<T> Function() queryFn,
+    required QueryFunctionWithRef<T> queryFn,
     QueryOptions<T>? options,
-  }) => queryProvider<T>(
-      name: name,
-      queryFn: queryFn,
-      options: options ?? QueryOptions<T>(),
-    );
+  }) =>
+      queryProvider<T>(
+        name: name,
+        queryFn: queryFn,
+        options: options ?? QueryOptions<T>(),
+      );
 
   /// Create a mutation provider from a simple function
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// final createUserProvider = QueryUtils.mutation<User, Map<String, dynamic>>(
@@ -42,28 +44,55 @@ class QueryUtils {
   ///   ),
   /// );
   /// ```
-  static StateNotifierProvider<MutationNotifier<T, TVariables>, MutationState<T>> mutation<T, TVariables>({
+  static NotifierProvider<MutationNotifier<T, TVariables>, MutationState<T>>
+      createMutationWithOptions<T, TVariables>({
     required String name,
-    required Future<T> Function(TVariables) mutationFn,
-    MutationOptions<T, TVariables>? options,
-  }) => mutationProvider<T, TVariables>(
-      name: name,
-      mutationFn: mutationFn,
-      options: options ?? MutationOptions<T, TVariables>(),
-    );
+    required MutationFunctionWithRef<T, TVariables> mutationFn,
+    MutationOptions<T, TVariables, TVariables>? options,
+  }) =>
+          createProvider<T, TVariables>(
+            name: name,
+            mutationFn: mutationFn,
+            onSuccess: (ref, data, variables) =>
+                options?.onSuccess?.call(ref, data, variables, variables),
+            onError: (ref, variables, error, stackTrace) => options?.onError
+                ?.call(ref, variables, variables, error, stackTrace),
+            onMutate: (ref, variables) =>
+                options?.onMutate?.call(ref, variables, variables) ??
+                Future<void>.value(),
+          );
+
+  /// Create a mutation provider from a simple function
+  static NotifierProvider<MutationNotifier<T, TVariables>, MutationState<T>>
+      createMutation<T, TVariables>({
+    required String name,
+    required MutationFunctionWithRef<T, TVariables> mutationFn,
+    int? retry = 0,
+    Duration? retryDelay = const Duration(seconds: 1),
+    OnSuccessFunctionWithRef<T, TVariables>? onSuccess,
+    OnErrorFunctionWithRef<T, TVariables>? onError,
+    OnMutateFunctionWithRef<T, TVariables>? onMutate,
+  }) =>
+          createProvider<T, TVariables>(
+            name: name,
+            mutationFn: mutationFn,
+            onSuccess: onSuccess,
+            onError: onError,
+            onMutate: onMutate,
+          );
 
   /// Create a cached data fetcher with automatic cache key generation
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
   /// class PayrollCheck extends _$PayrollCheck {
   ///   late final _payrollFetcher = QueryUtils.cachedFetcher<Result<GetPayrollResponse>>(
   ///     ref: ref,
-  ///     fetchFn: () => ref.read(apiClientProvider).getPayroll(),
+  ///     fetchFn: () => NetworkClient().auth.getPayroll(),
   ///     cacheKey: 'payroll-data', // optional, auto-generated if not provided
   ///   );
-  /// 
+  ///
   ///   Future<void> getPayroll() async {
   ///     await _payrollFetcher.getDataWithCallbacks(
   ///       onData: (result) => _updateState(result),
@@ -91,16 +120,10 @@ class QueryUtils {
 }
 
 /// Generic cached data fetcher with automatic cache key generation and lifecycle management
-/// 
+///
 /// This class encapsulates all caching logic and provides a clean API for data fetching
 /// with automatic cache management, error handling, and refresh capabilities.
 class CachedDataFetcher<T> {
-  final Ref ref;
-  final String cacheKey;
-  final Future<T> Function() fetchFn;
-  final Duration? cacheDuration;
-  final bool cacheErrors;
-
   CachedDataFetcher({
     required this.ref,
     required this.fetchFn,
@@ -108,6 +131,11 @@ class CachedDataFetcher<T> {
     this.cacheDuration,
     this.cacheErrors = false,
   }) : cacheKey = cacheKey ?? _generateCacheKey<T>(fetchFn);
+  final Ref ref;
+  final String cacheKey;
+  final Future<T> Function() fetchFn;
+  final Duration? cacheDuration;
+  final bool cacheErrors;
 
   /// Generate automatic cache key based on function and type
   static String _generateCacheKey<T>(Future<T> Function() fetchFn) {
@@ -117,7 +145,7 @@ class CachedDataFetcher<T> {
   }
 
   /// Get data with automatic caching and staleness checks (original method for backward compatibility)
-  /// 
+  ///
   /// [forceRefresh] - if true, bypasses cache and fetches fresh data
   /// [updateCache] - if false, doesn't update cache with new data (useful for one-time fetches)
   Future<T> getData({
@@ -137,12 +165,12 @@ class CachedDataFetcher<T> {
     try {
       // Fetch fresh data
       final result = await fetchFn();
-      
+
       // Cache the successful result
       if (updateCache) {
         queryClient.setQueryData<T>(cacheKey, result);
       }
-      
+
       return result;
     } catch (error) {
       // Optionally cache errors to prevent repeated failed requests
@@ -176,11 +204,10 @@ class CachedDataFetcher<T> {
   /// Get data if cached, otherwise fetch and cache
   /// This is an alias for getData() with default parameters
   Future<T> getOrFetch() => getData();
-
 }
 
 /// Smart cached data fetcher with stale-while-revalidate strategy
-/// 
+///
 /// This advanced fetcher implements React Query's stale-while-revalidate pattern:
 /// - Returns cached data immediately if available
 /// - Fetches fresh data in background
@@ -188,42 +215,6 @@ class CachedDataFetcher<T> {
 /// - Supports window focus and background refresh
 /// - Handles lifecycle events automatically
 class SmartCachedFetcher<T> {
-  final dynamic ref; // Accept both Ref and WidgetRef
-  final String cacheKey;
-  final Future<T> Function() fetchFn;
-  final void Function(T data) onData;
-  final void Function() onLoading;
-  final void Function(Object error) onError;
-  final Duration staleTime;
-  final Duration cacheTime;
-  final bool enableBackgroundRefresh;
-  final bool enableWindowFocusRefresh;
-  final bool cacheErrors;
-
-  DateTime? _lastFetchTime;
-  bool _isCurrentlyFetching = false;
-  
-  /// Get query client from either Ref or WidgetRef
-  QueryClient _getQueryClient() {
-    if (ref is Ref) {
-      return (ref as Ref).queryClient;
-    } else if (ref is WidgetRef) {
-      return (ref as WidgetRef).queryClient;
-    } else {
-      throw StateError('ref must be either Ref or WidgetRef');
-    }
-  }
-  
-  
-  /// Remove queries safely
-  void _removeQueries(String pattern) {
-    if (ref is Ref) {
-      (ref as Ref).removeQueries(pattern);
-    } else if (ref is WidgetRef) {
-      (ref as WidgetRef).removeQueries(pattern);
-    }
-  }
-
   SmartCachedFetcher({
     required this.ref,
     required this.fetchFn,
@@ -238,6 +229,40 @@ class SmartCachedFetcher<T> {
     this.cacheErrors = false,
   }) : cacheKey = cacheKey ?? _generateCacheKey<T>(fetchFn) {
     _setupLifecycleListeners();
+  }
+  final dynamic ref; // Accept both Ref and WidgetRef
+  final String cacheKey;
+  final Future<T> Function() fetchFn;
+  final void Function(T data) onData;
+  final void Function() onLoading;
+  final void Function(Object error) onError;
+  final Duration staleTime;
+  final Duration cacheTime;
+  final bool enableBackgroundRefresh;
+  final bool enableWindowFocusRefresh;
+  final bool cacheErrors;
+
+  DateTime? _lastFetchTime;
+  bool _isCurrentlyFetching = false;
+
+  /// Get query client from either Ref or WidgetRef
+  QueryClient _getQueryClient() {
+    if (ref is Ref) {
+      return (ref as Ref).queryClient;
+    } else if (ref is WidgetRef) {
+      return (ref as WidgetRef).queryClient;
+    } else {
+      throw StateError('ref must be either Ref or WidgetRef');
+    }
+  }
+
+  /// Remove queries safely
+  void _removeQueries(String pattern) {
+    if (ref is Ref) {
+      (ref as Ref).removeQueries(pattern);
+    } else if (ref is WidgetRef) {
+      (ref as WidgetRef).removeQueries(pattern);
+    }
   }
 
   /// Generate automatic cache key based on function and type
@@ -267,7 +292,7 @@ class SmartCachedFetcher<T> {
     if (cachedData != null && !forceRefresh) {
       // Return cached data immediately
       onData(cachedData);
-      
+
       // If data is stale, fetch fresh data in background
       if (isStale && !_isCurrentlyFetching) {
         _fetchInBackground();
@@ -295,7 +320,7 @@ class SmartCachedFetcher<T> {
     if (_isCurrentlyFetching) {
       return;
     }
-    
+
     _performFetch(showLoading: false).catchError((error) {
       // Silent error handling for background refresh
       // Don't call onError to avoid disrupting user experience
@@ -307,7 +332,7 @@ class SmartCachedFetcher<T> {
     if (_isCurrentlyFetching) {
       return;
     }
-    
+
     _isCurrentlyFetching = true;
     final queryClient = _getQueryClient();
 
@@ -315,10 +340,10 @@ class SmartCachedFetcher<T> {
       // Fetch fresh data
       final result = await fetchFn();
       _lastFetchTime = DateTime.now();
-      
+
       // Cache the successful result
       queryClient.setQueryData<T>(cacheKey, result);
-      
+
       // Update state with fresh data
       onData(result);
     } catch (error) {
@@ -326,7 +351,7 @@ class SmartCachedFetcher<T> {
       if (cacheErrors) {
         queryClient.setQueryData<T?>(cacheKey, null);
       }
-      
+
       // Only show error if this is not a background refresh
       if (showLoading) {
         onError(error);
@@ -382,48 +407,48 @@ class SmartCachedFetcher<T> {
 /// Extensions for @riverpod providers to add query capabilities
 extension RiverpodQueryExtensions on Ref {
   /// Get the query client for cache operations
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
   /// Future<User> createUser(CreateUserRef ref, Map<String, dynamic> userData) async {
   ///   final queryClient = ref.queryClient;
-  ///   
+  ///
   ///   // Optimistic update
   ///   final currentUsers = queryClient.getQueryData<List<User>>('users');
   ///   if (currentUsers != null) {
   ///     queryClient.setQueryData('users', [...currentUsers, newUser]);
   ///   }
-  ///   
+  ///
   ///   final result = await ApiService.createUser(userData);
-  ///   
+  ///
   ///   // Invalidate cache
   ///   queryClient.invalidateQueries('users');
-  ///   
+  ///
   ///   return result;
   /// }
   /// ```
   QueryClient get queryClient => QueryClient.instance;
 
   /// Create a smart cached data fetcher with stale-while-revalidate strategy
-  /// 
+  ///
   /// This fetcher implements the following strategy:
   /// 1. If cached data exists, return it immediately
   /// 2. Simultaneously fetch fresh data in background
   /// 3. Update state when fresh data arrives
   /// 4. Support window focus and background refresh
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
   /// class PayrollCheck extends _$PayrollCheck {
   ///   late final _fetcher = ref.cachedFetcher<Result<GetPayrollResponse>>(
-  ///     fetchFn: () => ref.read(apiClientProvider).getPayroll(),
+  ///     fetchFn: () => NetworkClient().auth.getPayroll(),
   ///     onData: (data) => state = state.copyWith(checkPayrollResult: data, employeesList: data.response?.employees),
   ///     onLoading: () => state = state.copyWith(checkPayrollResult: Result.pending()),
   ///     onError: (error) => state = state.copyWith(checkPayrollResult: Result.fail()),
   ///   );
-  /// 
+  ///
   ///   Future<void> getPayroll() => _fetcher.fetch();
   /// }
   /// ```
@@ -455,7 +480,7 @@ extension RiverpodQueryExtensions on Ref {
   }
 
   /// Invalidate queries by pattern
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
@@ -469,14 +494,14 @@ extension RiverpodQueryExtensions on Ref {
   }
 
   /// Set query data optimistically
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
   /// Future<Post> updatePost(UpdatePostRef ref, int postId, Map<String, dynamic> data) async {
   ///   // Optimistic update
   ///   ref.setQueryData('post-$postId', optimisticPost);
-  ///   
+  ///
   ///   try {
   ///     final result = await ApiService.updatePost(postId, data);
   ///     ref.setQueryData('post-$postId', result);
@@ -493,7 +518,7 @@ extension RiverpodQueryExtensions on Ref {
   }
 
   /// Get cached query data
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
@@ -503,14 +528,14 @@ extension RiverpodQueryExtensions on Ref {
   ///   if (cachedPosts != null) {
   ///     return cachedPosts.where((post) => post.userId == userId).toList();
   ///   }
-  ///   
+  ///
   ///   return ApiService.fetchUserPosts(userId);
   /// }
   /// ```
   T? getQueryData<T>(String key) => queryClient.getQueryData<T>(key);
 
   /// Remove queries from cache
-  /// 
+  ///
   /// Example:
   /// ```dart
   /// @riverpod
@@ -525,13 +550,13 @@ extension RiverpodQueryExtensions on Ref {
 }
 
 /// Mixin to add query capabilities to Notifier or StateNotifier
-/// 
+///
 /// Example:
 /// ```dart
 /// class PostsNotifier extends Notifier<List<Post>> with QueryCapabilities<List<Post>> {
 ///   @override
 ///   List<Post> build() => [];
-/// 
+///
 ///   Future<void> loadPosts() async {
 ///     final posts = await executeQuery(
 ///       queryKey: 'posts',
@@ -539,7 +564,7 @@ extension RiverpodQueryExtensions on Ref {
 ///     );
 ///     state = posts;
 ///   }
-/// 
+///
 ///   Future<void> createPost(Map<String, dynamic> postData) async {
 ///     final newPost = await ApiService.createPost(postData);
 ///     state = [...state, newPost];
@@ -547,20 +572,20 @@ extension RiverpodQueryExtensions on Ref {
 ///   }
 /// }
 /// ```
-mixin QueryCapabilities<T> on StateNotifier<T> {
+mixin MemoryQueryCapabilities<T> on StateNotifier<T> {
   /// Execute a query with caching
   Future<R> executeQuery<R>({
     required String queryKey,
     required Future<R> Function() queryFn,
   }) async {
-    final cache = getGlobalQueryCache();
+    final cache = MemoryQueryCache();
     final cached = cache.get<R>(queryKey);
-    
+
     // Return cached data if available and fresh
     if (cached != null && cached.hasData) {
       return cached.data!;
     }
-    
+
     try {
       final result = await queryFn();
       // Note: Simplified caching - in real implementation you'd want to use proper cache entry creation
@@ -572,8 +597,7 @@ mixin QueryCapabilities<T> on StateNotifier<T> {
 
   /// Invalidate queries by pattern
   void invalidateQueries(String pattern) {
-    final queryClient = QueryClient();
-    queryClient.invalidateQueries(pattern);
+    QueryClient.instance.invalidateQueries(pattern);
   }
 }
 
@@ -606,15 +630,15 @@ extension WidgetRefQueryExtensions on WidgetRef {
       cacheErrors: cacheErrors,
     );
   }
-  
+
   /// Get query client for WidgetRef
   QueryClient get queryClient => QueryClient.instance;
-  
+
   /// Invalidate queries by pattern for WidgetRef
   void invalidateQueries(String pattern) {
     QueryClient.instance.invalidateQueries(pattern);
   }
-  
+
   /// Remove queries by pattern for WidgetRef
   void removeQueries(String pattern) {
     QueryClient.instance.removeQueries(pattern);

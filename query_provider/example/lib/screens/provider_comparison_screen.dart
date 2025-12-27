@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
-import '../providers/user_providers.dart';
 import '../models/user.dart';
+import '../providers/user_providers.dart';
 
 class ProviderComparisonScreen extends ConsumerWidget {
   const ProviderComparisonScreen({super.key});
@@ -53,10 +53,10 @@ class ProviderComparisonScreen extends ConsumerWidget {
               context,
               title: '1. Function Approach',
               description: 'userQueryProvider(userId) - Creates provider in function',
-              code: '''
+              code: r'''
 StateNotifierProvider<QueryNotifier<User>, QueryState<User>> userQueryProvider(int userId) {
   return queryProvider<User>(
-    name: 'user-\$userId',
+    name: 'user-$userId',
     queryFn: () => ApiService.fetchUser(userId),
   );
 }

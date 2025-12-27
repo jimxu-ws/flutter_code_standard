@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
@@ -32,8 +33,8 @@ class _CacheDebugScreenState extends ConsumerState<CacheDebugScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final queryClient = ref.read(queryClientProvider);
-    final cache = getGlobalQueryCache();
+    final queryClient = ref.read(memoryQueryClientProvider);
+    final cache = getCache();
     final stats = cache.stats;
     final cacheKeys = cache.keys;
 
@@ -173,7 +174,7 @@ class _CacheDebugScreenState extends ConsumerState<CacheDebugScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.schedule, color: Colors.purple, size: 24),
+                  const Icon(Icons.schedule, color: Colors.purple, size: 24),
                   const SizedBox(height: 4),
                   Text(
                     _getNextCleanupText(cache),
@@ -353,8 +354,10 @@ class _CacheDebugScreenState extends ConsumerState<CacheDebugScreen> {
   }
 
   Widget _buildCacheEntryTile(QueryCache cache, String key) {
-    final entry = cache.get(key);
-    if (entry == null) return const SizedBox.shrink();
+    final entry = cache.get<dynamic>(key);
+    if (entry == null) {
+      return const SizedBox.shrink();
+    }
 
     final isStale = entry.isStale;
     final hasData = entry.hasData;
@@ -390,8 +393,8 @@ class _CacheDebugScreenState extends ConsumerState<CacheDebugScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildEntryDetail('Fetched At', entry.fetchedAt.toString()),
-                _buildEntryDetail('Stale Time', entry.options.staleTime.toString()),
-                _buildEntryDetail('Cache Time', entry.options.cacheTime.toString()),
+                _buildEntryDetail('Stale Time', entry.staleTime.toString()),
+                _buildEntryDetail('Cache Time', entry.cacheTime.toString()),
                 if (hasData) _buildEntryDetail('Data Type', entry.data.runtimeType.toString()),
                 if (hasError) _buildEntryDetail('Error', entry.error.toString()),
                 const SizedBox(height: 8),

@@ -9,19 +9,18 @@ void main() {
     late WindowFocusManager manager;
 
     setUp(() {
-      manager = WindowFocusManager.instance;
+      manager = WindowFocusManager();
     });
 
     test('should be a singleton', () {
-      final manager1 = WindowFocusManager.instance;
-      final manager2 = WindowFocusManager.instance;
+      final manager1 = WindowFocusManager();
+      final manager2 = WindowFocusManager();
       
       expect(identical(manager1, manager2), true);
     });
 
     test('should have default window focus as true', () {
       expect(manager.windowHasFocus, true);
-      expect(manager.windowHasLostFocus, false);
     });
 
     test('should detect platform support correctly', () {
@@ -50,7 +49,6 @@ void main() {
       // Simulate losing focus
       manager.setWindowFocus(false);
       expect(manager.windowHasFocus, false);
-      expect(manager.windowHasLostFocus, true);
       expect(blurCallbackCalled, true);
       expect(focusCallbackCalled, false);
       
@@ -61,7 +59,6 @@ void main() {
       // Simulate gaining focus
       manager.setWindowFocus(true);
       expect(manager.windowHasFocus, true);
-      expect(manager.windowHasLostFocus, false);
       expect(focusCallbackCalled, true);
       expect(blurCallbackCalled, false);
     });
@@ -218,11 +215,9 @@ void main() {
       
       manager.setWindowFocus(false);
       expect(manager.windowHasFocus, false);
-      expect(manager.windowHasLostFocus, true);
       
       manager.setWindowFocus(true);
       expect(manager.windowHasFocus, true);
-      expect(manager.windowHasLostFocus, false);
     });
   });
 
@@ -231,7 +226,7 @@ void main() {
     // through the WindowFocusManager's behavior on desktop platforms
     
     test('should be created and used by WindowFocusManager on supported platforms', () {
-      final manager = WindowFocusManager.instance;
+      final manager = WindowFocusManager();
       
       // The manager should initialize without errors
       expect(manager, isNotNull);

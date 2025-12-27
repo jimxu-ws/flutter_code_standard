@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +17,7 @@ import '../extensions/riverpod_extensions.dart';
 ///   Widget build(BuildContext context, WidgetRef ref) {
 ///     final payrollQuery = useSmartQuery<Result<GetPayrollResponse>>(
 ///       ref: ref,
-///       fetchFn: () => ref.read(apiClientProvider).getPayroll(),
+///       fetchFn: () => NetworkClient().auth.getPayroll(),
 ///       cacheKey: 'payroll-data',
 ///       staleTime: const Duration(minutes: 5),
 ///     );
@@ -72,7 +73,7 @@ SmartQueryResult<T> useSmartQuery<T>({
 ///   Widget build(BuildContext context, WidgetRef ref) {
 ///     final createUserMutation = useSmartMutation<User, Map<String, dynamic>>(
 ///       ref: ref,
-///       mutationFn: (userData) => ref.read(apiClientProvider).createUser(userData),
+///       mutationFn: (userData) => NetworkClient().auth.createUser(userData),
 ///       onSuccess: (user, variables) {
 ///         // Invalidate users query
 ///         ref.invalidateQueries('users');
@@ -116,15 +117,6 @@ SmartMutationResult<T, V> useSmartMutation<T, V>({
 
 /// Result object for smart queries
 class SmartQueryResult<T> {
-  final T? data;
-  final Object? error;
-  final bool isLoading;
-  final bool isFetching;
-  final bool isStale;
-  final bool isCached;
-  final Future<void> Function() refetch;
-  final Future<void> Function() refresh;
-  final void Function() clearCache;
 
   const SmartQueryResult({
     required this.data,
@@ -137,6 +129,15 @@ class SmartQueryResult<T> {
     required this.refresh,
     required this.clearCache,
   });
+  final T? data;
+  final Object? error;
+  final bool isLoading;
+  final bool isFetching;
+  final bool isStale;
+  final bool isCached;
+  final Future<void> Function() refetch;
+  final Future<void> Function() refresh;
+  final void Function() clearCache;
 
   /// Check if query has data
   bool get hasData => data != null;
@@ -153,12 +154,6 @@ class SmartQueryResult<T> {
 
 /// Result object for smart mutations
 class SmartMutationResult<T, V> {
-  final T? data;
-  final Object? error;
-  final bool isLoading;
-  final Future<void> Function(V variables) mutate;
-  final Future<void> Function(V variables) mutateAsync;
-  final void Function() reset;
 
   const SmartMutationResult({
     required this.data,
@@ -168,6 +163,12 @@ class SmartMutationResult<T, V> {
     required this.mutateAsync,
     required this.reset,
   });
+  final T? data;
+  final Object? error;
+  final bool isLoading;
+  final Future<void> Function(V variables) mutate;
+  final Future<void> Function(V variables) mutateAsync;
+  final void Function() reset;
 
   /// Check if mutation has data
   bool get hasData => data != null;
@@ -184,15 +185,6 @@ class SmartMutationResult<T, V> {
 
 /// Internal hook implementation for smart queries
 class _SmartQueryHook<T> extends Hook<SmartQueryResult<T>> {
-  final WidgetRef ref;
-  final Future<T> Function() fetchFn;
-  final String? cacheKey;
-  final Duration staleTime;
-  final Duration cacheTime;
-  final bool enableBackgroundRefresh;
-  final bool enableWindowFocusRefresh;
-  final bool cacheErrors;
-  final bool enabled;
 
   const _SmartQueryHook({
     required this.ref,
@@ -205,10 +197,33 @@ class _SmartQueryHook<T> extends Hook<SmartQueryResult<T>> {
     required this.cacheErrors,
     required this.enabled,
   });
+  final WidgetRef ref;
+  final Future<T> Function() fetchFn;
+  final String? cacheKey;
+  final Duration staleTime;
+  final Duration cacheTime;
+  final bool enableBackgroundRefresh;
+  final bool enableWindowFocusRefresh;
+  final bool cacheErrors;
+  final bool enabled;
 
   @override
   HookState<SmartQueryResult<T>, Hook<SmartQueryResult<T>>> createState() => 
       _SmartQueryHookState<T>();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<WidgetRef>('ref', ref));
+    properties.add(ObjectFlagProperty<Future<T> Function()>.has('fetchFn', fetchFn));
+    properties.add(StringProperty('cacheKey', cacheKey));
+    properties.add(DiagnosticsProperty<Duration>('staleTime', staleTime));
+    properties.add(DiagnosticsProperty<Duration>('cacheTime', cacheTime));
+    properties.add(DiagnosticsProperty<bool>('enableBackgroundRefresh', enableBackgroundRefresh));
+    properties.add(DiagnosticsProperty<bool>('enableWindowFocusRefresh', enableWindowFocusRefresh));
+    properties.add(DiagnosticsProperty<bool>('cacheErrors', cacheErrors));
+    properties.add(DiagnosticsProperty<bool>('enabled', enabled));
+  }
 }
 
 class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQueryHook<T>> {
@@ -307,11 +322,6 @@ class _SmartQueryHookState<T> extends HookState<SmartQueryResult<T>, _SmartQuery
 
 /// Internal hook implementation for smart mutations
 class _SmartMutationHook<T, V> extends Hook<SmartMutationResult<T, V>> {
-  final WidgetRef ref;
-  final Future<T> Function(V variables) mutationFn;
-  final void Function(T data, V variables)? onSuccess;
-  final void Function(Object error, V variables)? onError;
-  final Future<void> Function(V variables)? onMutate;
 
   const _SmartMutationHook({
     required this.ref,
@@ -320,10 +330,25 @@ class _SmartMutationHook<T, V> extends Hook<SmartMutationResult<T, V>> {
     required this.onError,
     required this.onMutate,
   });
+  final WidgetRef ref;
+  final Future<T> Function(V variables) mutationFn;
+  final void Function(T data, V variables)? onSuccess;
+  final void Function(Object error, V variables)? onError;
+  final Future<void> Function(V variables)? onMutate;
 
   @override
   HookState<SmartMutationResult<T, V>, Hook<SmartMutationResult<T, V>>> createState() => 
       _SmartMutationHookState<T, V>();
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<WidgetRef>('ref', ref));
+    properties.add(ObjectFlagProperty<Future<T> Function(V variables)>.has('mutationFn', mutationFn));
+    properties.add(ObjectFlagProperty<void Function(T data, V variables)?>.has('onSuccess', onSuccess));
+    properties.add(ObjectFlagProperty<void Function(Object error, V variables)?>.has('onError', onError));
+    properties.add(ObjectFlagProperty<Future<void> Function(V variables)?>.has('onMutate', onMutate));
+  }
 }
 
 class _SmartMutationHookState<T, V> extends HookState<SmartMutationResult<T, V>, _SmartMutationHook<T, V>> {

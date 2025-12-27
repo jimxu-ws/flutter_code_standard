@@ -5,15 +5,15 @@ import 'package:query_provider/query_provider.dart';
 // Mock API services that simulate real-world scenarios
 class WeatherService {
   static int _requestCount = 0;
-  
+
   static Future<Map<String, dynamic>> getCurrentWeather() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     _requestCount++;
-    
+
     final temps = [18, 22, 25, 19, 21, 24, 20];
     final conditions = ['Sunny', 'Cloudy', 'Rainy', 'Partly Cloudy', 'Clear'];
     final timestamp = DateTime.now();
-    
+
     return {
       'temperature': temps[_requestCount % temps.length],
       'condition': conditions[_requestCount % conditions.length],
@@ -27,11 +27,11 @@ class WeatherService {
 
 class NewsService {
   static int _articleCount = 0;
-  
+
   static Future<List<Map<String, dynamic>>> getBreakingNews() async {
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 600));
     _articleCount++;
-    
+
     final headlines = [
       'Tech Giants Report Strong Quarterly Earnings',
       'New Climate Agreement Reached at Global Summit',
@@ -39,14 +39,22 @@ class NewsService {
       'Space Mission Successfully Launches to Mars',
       'Economic Markets Show Positive Growth Trends',
     ];
-    
+
     return List.generate(3, (index) {
       final articleIndex = (_articleCount + index) % headlines.length;
       return {
         'id': _articleCount * 10 + index,
         'headline': headlines[articleIndex],
-        'timestamp': DateTime.now().subtract(Duration(minutes: index * 15)).toIso8601String(),
-        'category': ['Technology', 'Politics', 'Health', 'Science', 'Business'][articleIndex],
+        'timestamp': DateTime.now()
+            .subtract(Duration(minutes: index * 15))
+            .toIso8601String(),
+        'category': [
+          'Technology',
+          'Politics',
+          'Health',
+          'Science',
+          'Business'
+        ][articleIndex],
       };
     });
   }
@@ -54,17 +62,23 @@ class NewsService {
 
 class StockService {
   static int _updateCount = 0;
-  
+
   static Future<List<Map<String, dynamic>>> getStockPrices() async {
-    await Future.delayed(const Duration(milliseconds: 400));
+    await Future<void>.delayed(const Duration(milliseconds: 400));
     _updateCount++;
-    
+
     final stocks = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA'];
-    
+
     return stocks.map((symbol) {
-      final basePrice = {'AAPL': 150, 'GOOGL': 2800, 'MSFT': 300, 'AMZN': 3200, 'TSLA': 800}[symbol]!;
+      final basePrice = {
+        'AAPL': 150,
+        'GOOGL': 2800,
+        'MSFT': 300,
+        'AMZN': 3200,
+        'TSLA': 800
+      }[symbol]!;
       final change = ((_updateCount * 7) % 20) - 10; // -10 to +10
-      
+
       return {
         'symbol': symbol,
         'price': basePrice + change,
@@ -79,20 +93,20 @@ class StockService {
 // 🌤️ Weather query - Updates every 2 minutes when app is active
 final weatherProvider = queryProvider<Map<String, dynamic>>(
   name: 'current-weather',
-  queryFn: WeatherService.getCurrentWeather,
+  queryFn: (ref) => WeatherService.getCurrentWeather(),
   options: const QueryOptions(
     // ⏰ Regular updates when app is active
     refetchInterval: Duration(minutes: 2),
-    
+
     // 🔄 Refresh when app comes back to foreground
-    refetchOnAppFocus: true,
-    
+    refetchOnWindowFocus: true,
+
     // ⏸️ Pause updates when app goes to background
     pauseRefetchInBackground: true,
-    
+
     // 📊 Data is stale after 1 minute
     staleTime: Duration(minutes: 1),
-    
+
     // 👀 Keep showing old weather while updating
     keepPreviousData: true,
   ),
@@ -101,20 +115,20 @@ final weatherProvider = queryProvider<Map<String, dynamic>>(
 // 📰 News query - Frequent updates for breaking news
 final newsProvider = queryProvider<List<Map<String, dynamic>>>(
   name: 'breaking-news',
-  queryFn: NewsService.getBreakingNews,
+  queryFn: (ref) => NewsService.getBreakingNews(),
   options: const QueryOptions(
     // ⚡ Frequent updates for breaking news
     refetchInterval: Duration(seconds: 30),
-    
+
     // 🔄 Immediate refresh when returning to app
-    refetchOnAppFocus: true,
-    
+    refetchOnWindowFocus: true,
+
     // ⏸️ Stop news updates in background to save battery
     pauseRefetchInBackground: true,
-    
+
     // 📊 News is stale after 20 seconds
     staleTime: Duration(seconds: 20),
-    
+
     keepPreviousData: true,
   ),
 );
@@ -122,20 +136,20 @@ final newsProvider = queryProvider<List<Map<String, dynamic>>>(
 // 📈 Stock prices - Real-time when active, paused in background
 final stocksProvider = queryProvider<List<Map<String, dynamic>>>(
   name: 'stock-prices',
-  queryFn: StockService.getStockPrices,
+  queryFn: (ref) => StockService.getStockPrices(),
   options: const QueryOptions(
     // 🚀 Very frequent updates for real-time trading
     refetchInterval: Duration(seconds: 10),
-    
+
     // 🔄 Critical to refresh when returning to trading app
-    refetchOnAppFocus: true,
-    
+    refetchOnWindowFocus: true,
+
     // ⏸️ Pause expensive stock updates in background
     pauseRefetchInBackground: true,
-    
+
     // 📊 Stock data is stale after 5 seconds
     staleTime: Duration(seconds: 5),
-    
+
     keepPreviousData: true,
   ),
 );
@@ -144,12 +158,13 @@ class BackgroundForegroundExample extends ConsumerStatefulWidget {
   const BackgroundForegroundExample({super.key});
 
   @override
-  ConsumerState<BackgroundForegroundExample> createState() => _BackgroundForegroundExampleState();
+  ConsumerState<BackgroundForegroundExample> createState() =>
+      _BackgroundForegroundExampleState();
 }
 
-class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegroundExample> 
+class _BackgroundForegroundExampleState
+    extends ConsumerState<BackgroundForegroundExample>
     with WidgetsBindingObserver {
-  
   DateTime? _lastBackgroundTime;
   DateTime? _lastForegroundTime;
   int _backgroundCount = 0;
@@ -171,7 +186,8 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     setState(() {
-      if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive) {
         _lastBackgroundTime = DateTime.now();
         _backgroundCount++;
       } else if (state == AppLifecycleState.resumed) {
@@ -208,7 +224,8 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
                 Icon(
                   isInForeground ? Icons.play_arrow : Icons.pause,
                   size: 16,
-                  color: isInForeground ? Colors.green[700] : Colors.orange[700],
+                  color:
+                      isInForeground ? Colors.green[700] : Colors.orange[700],
                 ),
                 const SizedBox(width: 4),
                 Text(
@@ -216,7 +233,8 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: isInForeground ? Colors.green[700] : Colors.orange[700],
+                    color:
+                        isInForeground ? Colors.green[700] : Colors.orange[700],
                   ),
                 ),
               ],
@@ -241,24 +259,24 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             children: [
               // App lifecycle status
               _buildLifecycleCard(appState, isInForeground),
-              
+
               const SizedBox(height: 16),
-              
+
               // Weather section
               _buildWeatherCard(weather),
-              
+
               const SizedBox(height: 16),
-              
+
               // News section
               _buildNewsCard(news),
-              
+
               const SizedBox(height: 16),
-              
+
               // Stocks section
               _buildStocksCard(stocks),
-              
+
               const SizedBox(height: 16),
-              
+
               // Instructions
               _buildInstructionsCard(),
             ],
@@ -283,9 +301,9 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
                   color: isInForeground ? Colors.green : Colors.orange,
                 ),
                 const SizedBox(width: 8),
-                Text(
+                const Text(
                   'App Lifecycle Status',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -293,14 +311,16 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
               ],
             ),
             const SizedBox(height: 12),
-            _buildStatusRow('Current State', appState.name.toUpperCase(), 
+            _buildStatusRow('Current State', appState.name.toUpperCase(),
                 isInForeground ? Colors.green : Colors.orange),
-            _buildStatusRow('Query Behavior', 
-                isInForeground ? 'ACTIVE REFETCHING' : 'PAUSED REFETCHING', 
+            _buildStatusRow(
+                'Query Behavior',
+                isInForeground ? 'ACTIVE REFETCHING' : 'PAUSED REFETCHING',
                 isInForeground ? Colors.green : Colors.orange),
-            _buildStatusRow('Background Count', _backgroundCount.toString(), Colors.red),
-            _buildStatusRow('Foreground Count', _foregroundCount.toString(), Colors.blue),
-            
+            _buildStatusRow(
+                'Background Count', _backgroundCount.toString(), Colors.red),
+            _buildStatusRow(
+                'Foreground Count', _foregroundCount.toString(), Colors.blue),
             if (_lastBackgroundTime != null) ...[
               const SizedBox(height: 8),
               Text(
@@ -346,12 +366,15 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             ),
             const SizedBox(height: 12),
             weather.when(
-              idle: () => const Text('Ready to load weather'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (data) => _buildWeatherContent(data),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousData) => _buildWeatherContent(previousData),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load weather'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildWeatherContent,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildWeatherContent,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⏰ Updates every 2 minutes (when app is active)',
@@ -372,10 +395,11 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             children: [
               Text(
                 '${data['temperature']}°C',
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
               ),
               Text(
-                data['condition'],
+                data['condition'] as String,
                 style: const TextStyle(fontSize: 16, color: Colors.grey),
               ),
             ],
@@ -421,12 +445,15 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             ),
             const SizedBox(height: 12),
             news.when(
-              idle: () => const Text('Ready to load news'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (articles) => _buildNewsList(articles),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousArticles) => _buildNewsList(previousArticles),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load news'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildNewsList,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildNewsList,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⚡ Updates every 30 seconds (paused in background)',
@@ -454,26 +481,27 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                article['headline'],
+                article['headline'] as String,
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.blue[100],
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      article['category'],
+                      article['category'] as String,
                       style: TextStyle(fontSize: 10, color: Colors.blue[700]),
                     ),
                   ),
                   const Spacer(),
                   Text(
-                    _formatTime(DateTime.parse(article['timestamp'])),
+                    _formatTime(DateTime.parse(article['timestamp'] as String)),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
@@ -511,12 +539,15 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             ),
             const SizedBox(height: 12),
             stocks.when(
-              idle: () => const Text('Ready to load stocks'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (stockList) => _buildStocksList(stockList),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousStocks) => _buildStocksList(previousStocks),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load stocks'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildStocksList,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildStocksList,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '🚀 Updates every 10 seconds (real-time when active)',
@@ -533,7 +564,7 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
       children: stockList.map((stock) {
         final change = stock['change'] as int;
         final isPositive = change >= 0;
-        
+
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           padding: const EdgeInsets.all(12),
@@ -548,7 +579,7 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             children: [
               Expanded(
                 child: Text(
-                  stock['symbol'],
+                  stock['symbol'] as String,
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -599,7 +630,7 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -653,7 +684,7 @@ class _BackgroundForegroundExampleState extends ConsumerState<BackgroundForegrou
             ),
             _buildInstructionPoint(
               '📊 Check Counters',
-              'Background/Foreground counters show how many times you\'ve switched',
+              "Background/Foreground counters show how many times you've switched",
             ),
             _buildInstructionPoint(
               '🔄 Pull to Refresh',

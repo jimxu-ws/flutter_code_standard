@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
-import '../providers/user_providers.dart';
 import '../models/user.dart';
+import '../providers/user_providers.dart';
 
 class UserSearchScreen extends ConsumerStatefulWidget {
   const UserSearchScreen({super.key});
@@ -215,9 +216,7 @@ class _UserSearchScreenState extends ConsumerState<UserSearchScreen> {
 
 class SearchResultTile extends StatelessWidget {
   const SearchResultTile({
-    super.key,
-    required this.user,
-    required this.query,
+    required this.user, required this.query, super.key,
   });
 
   final User user;
@@ -264,7 +263,7 @@ class SearchResultTile extends StatelessWidget {
   }
 
   void _showUserDetails(BuildContext context, User user) {
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(user.name),
@@ -287,5 +286,12 @@ class SearchResultTile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<User>('user', user));
+    properties.add(StringProperty('query', query));
   }
 }

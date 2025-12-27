@@ -1,14 +1,15 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:query_provider/query_provider.dart';
 
-import '../providers/user_providers.dart';
-import '../providers/post_providers.dart';
-import '../models/user.dart';
 import '../models/post.dart';
+import '../models/user.dart';
+import '../providers/post_providers.dart';
+import '../providers/user_providers.dart';
 
 class UserDetailScreen extends ConsumerWidget {
-  const UserDetailScreen({super.key, required this.userId});
+  const UserDetailScreen({required this.userId, super.key});
 
   final int userId;
 
@@ -132,10 +133,16 @@ class UserDetailScreen extends ConsumerWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(IntProperty('userId', userId));
+  }
 }
 
 class UserInfoCard extends StatelessWidget {
-  const UserInfoCard({super.key, required this.user});
+  const UserInfoCard({required this.user, super.key});
 
   final User user;
 
@@ -178,10 +185,16 @@ class UserInfoCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<User>('user', user));
+  }
 }
 
 class PostCard extends StatelessWidget {
-  const PostCard({super.key, required this.post});
+  const PostCard({required this.post, super.key});
 
   final Post post;
 
@@ -213,10 +226,16 @@ class PostCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Post>('post', post));
+  }
 }
 
 class ErrorCard extends StatelessWidget {
-  const ErrorCard({super.key, required this.error, this.onRetry});
+  const ErrorCard({required this.error, super.key, this.onRetry});
 
   final Object error;
   final VoidCallback? onRetry;
@@ -248,5 +267,12 @@ class ErrorCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Object>('error', error));
+    properties.add(ObjectFlagProperty<VoidCallback?>.has('onRetry', onRetry));
   }
 }

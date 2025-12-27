@@ -1,0 +1,424 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../app_focus/window_focus_manager.dart';
+import '../cache/query_cache_base.dart';
+import '../cache/query_cache_entry.dart';
+import '../client/query_client.dart';
+import '../options/query_options.dart';
+import '../providers/query_state.dart';
+import '../utils/common_func.dart';
+import '../utils/log.dart';
+
+/// A function that fetches data for a query
+typedef QueryFunction<T> = Future<T> Function();
+
+/// A function that fetches data with a reference
+typedef QueryFunctionWithRef<T> = Future<T> Function(Ref ref);
+
+/// A function that fetches data with parameters
+typedef QueryFunctionWithParams<T, P> = Future<T> Function(P params);
+
+/// A function that fetches data with parameters and a reference
+typedef QueryFunctionWithParamsWithRef<T, P> = Future<T> Function(
+    Ref ref, P params);
+
+// QueryCacheEntry is now defined in query_cache.dart
+
+/// Notifier for managing query state
+class QueryStateNotifier<T> extends StateNotifier<QueryState<T>> {
+  QueryStateNotifier({
+    required this.queryFunction,
+    required this.options,
+    required this.queryKey,
+  }) : super(const QueryIdle()) {
+    _initialize();
+  }
+
+  final QueryFunction<T> queryFunction;
+  final QueryOptions<T> options;
+  final String queryKey;
+
+  Timer? _refetchTimer;
+  int _retryCount = 0;
+  // Initialize cache and window focus manager
+  QueryCache get _cache => getCache(strategy: options.cacheStrategy);
+  final WindowFocusManager _windowFocusManager = WindowFocusManager();
+  bool _isRefetchPaused = false;
+  bool _isInitialized = false;
+
+  void _initialize() {
+    // Prevent duplicate initialization
+    if (!_isInitialized) {
+      _isInitialized = true;
+
+      // Set up cache change listener for automatic UI updates
+      _setupCacheListener();
+
+      // Set up window focus callbacks
+      _setupWindowFocusCallbacks();
+    }
+
+    if (options.enabled && options.refetchOnMount) {
+      _fetch();
+    }
+
+    // Set up automatic refetching if configured
+    if (options.enabled && options.refetchInterval != null) {
+      _scheduleRefetch();
+    }
+  }
+
+  void _safeState(QueryState<T> state) {
+    if (mounted) {
+      this.state = state;
+    }
+  }
+
+  /// Fetch data
+  Future<void> _fetch({bool forceFetchRemote = false}) async {
+    if (!options.enabled) {
+      return;
+    }
+
+    Log.info('Fetching data in query notifier for key $queryKey');
+
+    // Check cache first
+    final cachedEntry = _getCachedEntry();
+    if (!forceFetchRemote &&
+        cachedEntry != null &&
+        !cachedEntry.isStale &&
+        cachedEntry.hasData) {
+      Log.info('Using cached data in query notifier for key $queryKey');
+      _safeState(QuerySuccess(cachedEntry.data as T,
+          fetchedAt: cachedEntry.fetchedAt));
+      return;
+    }
+
+    // Determine loading state
+    if (mounted && options.keepPreviousData && state.hasData) {
+      Log.info('Using state data in query notifier for key $queryKey');
+      _safeState(
+          QueryRefetching(state.data as T, fetchedAt: cachedEntry?.fetchedAt));
+    } else if (options.keepPreviousData &&
+        cachedEntry != null &&
+        cachedEntry.hasData) {
+      Log.info('Using stale cached data in query notifier for key $queryKey');
+      _safeState(QueryRefetching(cachedEntry.data as T,
+          fetchedAt: cachedEntry.fetchedAt));
+    } else {
+      _safeState(const QueryLoading());
+    }
+
+    try {
+      Log.info('Querying data from server in query notifier for key $queryKey');
+
+      final data = await queryFunction();
+      final now = DateTime.now();
+
+      // Cache the result
+      _setCachedEntry(QueryCacheEntry<T>(
+        data: data,
+        fetchedAt: now,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
+      ));
+
+      _safeState(QuerySuccess(data, fetchedAt: now));
+      _retryCount = 0;
+
+      // Call success callback
+      options.onSuccess?.call(data);
+    } catch (error, stackTrace) {
+      if (_retryCount < options.retry) {
+        _retryCount++;
+        await Future<void>.delayed(options.retryDelay);
+        return _fetch();
+      }
+
+      // Cache the error
+      _cache.setError<T>(
+        queryKey,
+        error,
+        stackTrace: stackTrace,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
+      );
+
+      _safeState(QueryError(error, stackTrace: stackTrace));
+      _retryCount = 0;
+
+      // Call error callback
+      options.onError?.call(error, stackTrace);
+    }
+  }
+
+  /// Refetch the query
+  Future<void> refetch({bool forceFetchRemote = false}) =>
+      _fetch(forceFetchRemote: forceFetchRemote);
+
+  /// Invalidate and refetch
+  Future<void> refresh() {
+    _clearCache();
+    return _fetch();
+  }
+
+  /// Set query data manually (for optimistic updates)
+  void setData(T data) {
+    final now = DateTime.now();
+    _setCachedEntry(QueryCacheEntry<T>(
+      data: data,
+      fetchedAt: now,
+      cacheTime: options.cacheTime,
+      staleTime: options.staleTime,
+    ));
+    _safeState(QuerySuccess(data, fetchedAt: now));
+  }
+
+  /// Get current cached data
+  T? getCachedData() {
+    final entry = _getCachedEntry();
+    return entry?.hasData ?? false ? entry!.data as T : null;
+  }
+
+  void _scheduleRefetch() {
+    _refetchTimer?.cancel();
+    if (options.refetchInterval != null) {
+      _refetchTimer = Timer.periodic(options.refetchInterval!, (_) {
+        if (options.enabled && _shouldRefetch()) {
+          _fetch();
+        }
+      });
+    }
+  }
+
+  /// Check if refetch should proceed based on app state
+  bool _shouldRefetch() {
+    // If refetching is explicitly paused, don't refetch
+    if (_isRefetchPaused) {
+      return false;
+    }
+
+    // If pausing in background is enabled and app is in background, don't refetch
+    if (options.pauseRefetchInBackground && _windowFocusManager.windowLostFocus) {
+      return false;
+    }
+
+    return true;
+  }
+
+  void _onWindowBlured() {
+    if(isMobile()){
+      Log.info('App paused in query notifier');
+      // Mark refetching as paused
+      _isRefetchPaused = true;
+    }
+  }
+
+  /// Set up window focus callbacks
+  void _setupWindowFocusCallbacks() {
+    // Refetch when window gains focus (if enabled and data is stale)
+    if (options.refetchOnWindowFocus && _windowFocusManager.isSupported) {
+      _windowFocusManager.addOnFocusCallback(_onWindowFocused);
+    }
+
+    // Pause refetching when app goes to background (if enabled)
+    if (options.pauseRefetchInBackground) {
+      _windowFocusManager.addOnBlurCallback(_onWindowBlured);
+    }
+  }
+
+  void _onWindowFocused() {
+    Log.info('Window focused in query notifier');
+    // Resume refetching and check if we need to refetch stale data
+    _isRefetchPaused = false;
+
+    // Refetch stale data when window gains focus
+    final cachedEntry = _getCachedEntry();
+    if (cachedEntry != null && cachedEntry.isStale && options.enabled) {
+      _fetch();
+    }
+  }
+
+  QueryCacheEntry<T>? _getCachedEntry() =>
+      _cache.get<T>(queryKey, jsonParser: options.jsonParser);
+
+  void _setCachedEntry(QueryCacheEntry<T> entry) {
+    _cache.set(queryKey, entry);
+  }
+
+  void _clearCache() {
+    _cache.remove(queryKey);
+  }
+
+  /// Set up cache change listener for automatic UI updates
+  void _setupCacheListener() {
+    _cache.addListener<T>(queryKey, (entry) {
+      if (entry?.hasData ?? false) {
+        // Update state when cache data changes externally (e.g., optimistic updates)
+        _safeState(QuerySuccess(entry!.data as T, fetchedAt: entry.fetchedAt));
+      } else if (entry == null) {
+        // Cache entry was removed, reset to idle
+        if (options.onCacheEvicted != null) {
+          options.onCacheEvicted!(queryKey);
+          // }else if(mounted){
+          // refetch();
+        } else {
+          _safeState(const QueryIdle());
+        }
+      }
+      Log.info(
+          'Cache listener called for key $queryKey in query notifier, change state to ${state.runtimeType}');
+    });
+  }
+
+  @override
+  void dispose() {
+    _refetchTimer?.cancel();
+
+    // Clean up cache listener (removes ALL listeners for this queryKey)
+    _cache.removeAllListeners(queryKey);
+
+    // Clean up window focus callbacks
+    if (options.pauseRefetchInBackground) {
+      _windowFocusManager.removeOnBlurCallback(_onWindowBlured);
+    }
+
+    if (options.refetchOnWindowFocus && _windowFocusManager.isSupported) {
+      _windowFocusManager.removeOnFocusCallback(_onWindowFocused);
+    }
+
+    // Reset initialization flag
+    _isInitialized = false;
+
+    super.dispose();
+  }
+}
+
+/// Provider for creating queries
+///
+/// **⚠️ DEPRECATED:** StateNotifier is deprecated by Riverpod.
+/// Use `asyncQueryProvider` instead for new code.
+///
+/// Migration:
+/// ```dart
+/// // Old (deprecated)
+/// final userProvider = queryProvider<User>(
+///   name: 'user',
+///   queryFn: (ref) => fetchUser(),
+/// );
+///
+/// // New (recommended)
+/// final userProvider = asyncQueryProvider<User>(
+///   name: 'user',
+///   queryFn: (ref) => fetchUser(),
+/// );
+/// ```
+@Deprecated(
+    'Use asyncQueryProvider instead. StateNotifier is deprecated by Riverpod.')
+StateNotifierProvider<QueryStateNotifier<T>, QueryState<T>>
+    queryStateProvider<T>({
+  required String name,
+  required QueryFunctionWithRef<T> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) =>
+        StateNotifierProvider<QueryStateNotifier<T>, QueryState<T>>(
+          (ref) => QueryStateNotifier<T>(
+            queryFunction: () {
+              return queryFn(ref);
+            },
+            options: options,
+            queryKey: name,
+          ),
+          name: name,
+        );
+
+/// Auto-dispose provider for creating queries
+///
+/// **⚠️ DEPRECATED:** StateNotifier is deprecated by Riverpod.
+/// Use `asyncQueryProviderAutoDispose` instead for new code.
+@Deprecated(
+    'Use asyncQueryProviderAutoDispose instead. StateNotifier is deprecated by Riverpod.')
+AutoDisposeStateNotifierProvider<QueryStateNotifier<T>, QueryState<T>>
+    queryStateProviderAutoDispose<T>({
+  required String name,
+  required QueryFunctionWithRef<T> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) =>
+        StateNotifierProvider.autoDispose<QueryStateNotifier<T>, QueryState<T>>(
+          (ref) => QueryStateNotifier<T>(
+            queryFunction: () {
+              return queryFn(ref);
+            },
+            options: options,
+            queryKey: name,
+          ),
+          name: name,
+        );
+
+/// Provider family for creating queries with parameters
+///
+/// **⚠️ DEPRECATED:** StateNotifier is deprecated by Riverpod.
+/// Use `asyncQueryProviderFamily` instead for new code.
+@Deprecated(
+    'Use asyncQueryProviderFamily instead. StateNotifier is deprecated by Riverpod.')
+StateNotifierProviderFamily<QueryStateNotifier<T>, QueryState<T>, P>
+    queryStateProviderFamily<T, P>({
+  required String name,
+  required QueryFunctionWithParamsWithRef<T, P> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) =>
+        StateNotifierProvider.family<QueryStateNotifier<T>, QueryState<T>, P>(
+          (ref, param) => QueryStateNotifier<T>(
+            queryFunction: () {
+              return queryFn(ref, param);
+            },
+            options: options,
+            queryKey: '$name-$param',
+          ),
+          name: name,
+        );
+
+/// Auto-dispose provider family for creating queries with parameters
+///
+/// **⚠️ DEPRECATED:** StateNotifier is deprecated by Riverpod.
+/// Use `asyncQueryProviderFamilyAutoDispose` instead for new code.
+@Deprecated(
+    'Use asyncQueryProviderFamilyAutoDispose instead. StateNotifier is deprecated by Riverpod.')
+AutoDisposeStateNotifierProviderFamily<QueryStateNotifier<T>, QueryState<T>, P>
+    queryStateProviderFamilyAutoDispose<T, P>({
+  required String name,
+  required QueryFunctionWithParamsWithRef<T, P> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) =>
+        StateNotifierProvider.autoDispose
+            .family<QueryStateNotifier<T>, QueryState<T>, P>(
+          (ref, param) => QueryStateNotifier<T>(
+            queryFunction: () {
+              return queryFn(ref, param);
+            },
+            options: options,
+            queryKey: '$name-$param',
+          ),
+          name: name,
+        );
+
+/// Convenience function for creating parameterized queries with constant parameters
+StateNotifierProvider<QueryStateNotifier<T>, QueryState<T>>
+    queryStateProviderWithParams<T, P>({
+  required String name,
+  required P params, // Should be const for best practices
+  required QueryFunctionWithParamsWithRef<T, P> queryFn,
+  QueryOptions<T> options = const QueryOptions(),
+}) =>
+        StateNotifierProvider<QueryStateNotifier<T>, QueryState<T>>(
+          (ref) => QueryStateNotifier<T>(
+            queryFunction: () {
+              return queryFn(ref, params);
+            },
+            options: options,
+            queryKey: '$name-$params',
+          ),
+          name: '$name-$params',
+        );

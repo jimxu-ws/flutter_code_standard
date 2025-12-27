@@ -5,23 +5,23 @@ import 'package:query_provider/query_provider.dart';
 // Mock API service that simulates server data
 class ServerDataService {
   static int _counter = 0;
-  
+
   static Future<Map<String, dynamic>> getServerStatus() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     _counter++;
-    
+
     return {
       'server_time': DateTime.now().toIso8601String(),
       'request_count': _counter,
       'status': 'online',
-      'load': (50 + (_counter * 7) % 50).toString() + '%',
+      'load': '${50 + (_counter * 7) % 50}%',
     };
   }
-  
+
   static Future<List<String>> getRealtimeNotifications() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    
+
     return [
       'New message received ${timestamp % 1000}',
       'System update available',
@@ -33,20 +33,20 @@ class ServerDataService {
 // 🔄 Lifecycle-aware server status query
 final serverStatusProvider = queryProvider<Map<String, dynamic>>(
   name: 'server-status',
-  queryFn: ServerDataService.getServerStatus,
+  queryFn: (ref) => ServerDataService.getServerStatus(),
   options: const QueryOptions(
     // ⏰ Refetch every 10 seconds when app is active
     refetchInterval: Duration(seconds: 10),
-    
+
     // 🛑 Pause refetching when app goes to background
     pauseRefetchInBackground: true,
-    
+
     // 🔄 Refetch when app comes back to foreground
-    refetchOnAppFocus: true,
-    
+    refetchOnWindowFocus: true,
+
     // 📊 Data is stale after 5 seconds
     staleTime: Duration(seconds: 5),
-    
+
     // 👀 Keep showing old data during refetch
     keepPreviousData: true,
   ),
@@ -55,20 +55,20 @@ final serverStatusProvider = queryProvider<Map<String, dynamic>>(
 // 📱 Real-time notifications query
 final notificationsProvider = queryProvider<List<String>>(
   name: 'notifications',
-  queryFn: ServerDataService.getRealtimeNotifications,
+  queryFn: (ref) => ServerDataService.getRealtimeNotifications(),
   options: const QueryOptions(
     // ⚡ Frequent updates when app is active
     refetchInterval: Duration(seconds: 3),
-    
+
     // 🛑 Stop when in background to save battery
     pauseRefetchInBackground: true,
-    
+
     // 🔄 Immediate refresh when returning to app
-    refetchOnAppFocus: true,
-    
+    refetchOnWindowFocus: true,
+
     // 📊 Always consider stale for real-time data
     staleTime: Duration(seconds: 1),
-    
+
     keepPreviousData: true,
   ),
 );
@@ -99,7 +99,8 @@ class LifecycleAwareExample extends ConsumerWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              backgroundColor: isInForeground ? Colors.green[100] : Colors.orange[100],
+              backgroundColor:
+                  isInForeground ? Colors.green[100] : Colors.orange[100],
             ),
           ),
         ],
@@ -111,19 +112,19 @@ class LifecycleAwareExample extends ConsumerWidget {
           children: [
             // App lifecycle status
             _buildLifecycleCard(appState, isInForeground),
-            
+
             const SizedBox(height: 16),
-            
+
             // Server status section
             _buildServerStatusCard(serverStatus),
-            
+
             const SizedBox(height: 16),
-            
+
             // Notifications section
             _buildNotificationsCard(notifications),
-            
+
             const SizedBox(height: 16),
-            
+
             // Explanation card
             _buildExplanationCard(),
           ],
@@ -210,12 +211,15 @@ class LifecycleAwareExample extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             serverStatus.when(
-              idle: () => const Text('Ready to check server status'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (data) => _buildServerStatusContent(data),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousData) => _buildServerStatusContent(previousData),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to check server status'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildServerStatusContent,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildServerStatusContent,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⏰ Refetches every 10 seconds (when app is active)',
@@ -233,10 +237,12 @@ class LifecycleAwareExample extends ConsumerWidget {
   Widget _buildServerStatusContent(Map<String, dynamic> data) {
     return Column(
       children: [
-        _buildStatusRow('Status', data['status'], Colors.green),
-        _buildStatusRow('Server Load', data['load'], Colors.orange),
-        _buildStatusRow('Request Count', data['request_count'].toString(), Colors.blue),
-        _buildStatusRow('Last Update', data['server_time'].toString().substring(11, 19), Colors.grey),
+        _buildStatusRow('Status', data['status'] as String, Colors.green),
+        _buildStatusRow('Server Load', data['load'] as String, Colors.orange),
+        _buildStatusRow(
+            'Request Count', data['request_count'].toString(), Colors.blue),
+        _buildStatusRow('Last Update',
+            data['server_time'].toString().substring(11, 19), Colors.grey),
       ],
     );
   }
@@ -256,7 +262,7 @@ class LifecycleAwareExample extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -301,12 +307,15 @@ class LifecycleAwareExample extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             notifications.when(
-              idle: () => const Text('Ready to load notifications'),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              success: (data) => _buildNotificationsList(data),
-              error: (error, _) => Text('Error: $error', style: const TextStyle(color: Colors.red)),
-              refetching: (previousData) => _buildNotificationsList(previousData),
-            ) ?? const Text('Unknown state'),
+                  idle: () => const Text('Ready to load notifications'),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  success: _buildNotificationsList,
+                  error: (error, _) => Text('Error: $error',
+                      style: const TextStyle(color: Colors.red)),
+                  refetching: _buildNotificationsList,
+                ) ??
+                const Text('Unknown state'),
             const SizedBox(height: 8),
             Text(
               '⚡ Refetches every 3 seconds (paused in background)',

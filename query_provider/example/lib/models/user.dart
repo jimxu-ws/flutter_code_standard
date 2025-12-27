@@ -9,11 +9,6 @@ class User {
     this.avatar,
   });
 
-  final int id;
-  final String name;
-  final String email;
-  final String? avatar;
-
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] as int,
@@ -22,6 +17,11 @@ class User {
       avatar: json['avatar'] as String?,
     );
   }
+
+  final int id;
+  final String name;
+  final String email;
+  final String? avatar;
 
   Map<String, dynamic> toJson() {
     return {

@@ -1,23 +1,26 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:query_provider/query_provider.dart';
+import 'package:query_provider/src/cache/memory_cache.dart';
 
 void main() {
   group('QueryCacheEntry', () {
     test('should create entry with data', () {
       final now = DateTime.now();
       const options = QueryOptions<String>();
-      
+
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: now,
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       expect(entry.data, 'test data');
       expect(entry.error, null);
       expect(entry.stackTrace, null);
       expect(entry.fetchedAt, now);
-      expect(entry.options, options);
+      expect(entry.cacheTime, options.cacheTime);
+      expect(entry.staleTime, options.staleTime);
       expect(entry.hasData, true);
       expect(entry.hasError, false);
     });
@@ -27,20 +30,22 @@ void main() {
       final error = Exception('Test error');
       final stackTrace = StackTrace.current;
       const options = QueryOptions<String>();
-      
+
       final entry = QueryCacheEntry<String>(
         data: null,
         error: error,
         stackTrace: stackTrace,
         fetchedAt: now,
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       expect(entry.data, null);
       expect(entry.error, error);
       expect(entry.stackTrace, stackTrace);
       expect(entry.fetchedAt, now);
-      expect(entry.options, options);
+      expect(entry.cacheTime, options.cacheTime);
+      expect(entry.staleTime, options.staleTime);
       expect(entry.hasData, false);
       expect(entry.hasError, true);
     });
@@ -48,20 +53,22 @@ void main() {
     test('should calculate isStale correctly', () {
       final now = DateTime.now();
       const options = QueryOptions<String>(staleTime: Duration(minutes: 5));
-      
+
       // Fresh entry
       final freshEntry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: now,
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
       expect(freshEntry.isStale, false);
-      
+
       // Stale entry
       final staleEntry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: now.subtract(const Duration(minutes: 10)),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
       expect(staleEntry.isStale, true);
     });
@@ -69,20 +76,22 @@ void main() {
     test('should calculate isExpired correctly', () {
       final now = DateTime.now();
       const options = QueryOptions<String>(cacheTime: Duration(minutes: 30));
-      
+
       // Fresh entry
       final freshEntry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: now,
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
       expect(freshEntry.shouldEvict, false);
-      
+
       // Expired entry
       final expiredEntry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: now.subtract(const Duration(minutes: 45)),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
       expect(expiredEntry.shouldEvict, true);
     });
@@ -97,7 +106,7 @@ void main() {
         missCount: 20,
         evictionCount: 5,
       );
-      
+
       expect(stats.totalEntries, 10);
       expect(stats.staleEntries, 3);
       expect(stats.hitCount, 50);
@@ -113,7 +122,7 @@ void main() {
         missCount: 20,
         evictionCount: 5,
       );
-      
+
       expect(stats.hitRate, 0.8); // 80 / (80 + 20)
     });
 
@@ -125,7 +134,7 @@ void main() {
         missCount: 0,
         evictionCount: 0,
       );
-      
+
       expect(stats.hitRate, 0.0);
     });
 
@@ -137,7 +146,7 @@ void main() {
         missCount: 20,
         evictionCount: 5,
       );
-      
+
       final string = stats.toString();
       expect(string, contains('QueryCacheStats'));
       expect(string, contains('entries: 10'));
@@ -151,7 +160,7 @@ void main() {
     late QueryCache cache;
 
     setUp(() {
-      cache = QueryCache(maxSize: 5);
+      cache = MemoryQueryCache();
     });
 
     tearDown(() {
@@ -163,12 +172,13 @@ void main() {
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       cache.set('test-key', entry);
       final retrieved = cache.get<String>('test-key');
-      
+
       expect(retrieved, isNotNull);
       expect(retrieved!.data, 'test data');
       expect(retrieved.hasData, true);
@@ -184,14 +194,15 @@ void main() {
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       // Miss
       cache.get<String>('test-key');
       expect(cache.stats.missCount, 1);
       expect(cache.stats.hitCount, 0);
-      
+
       // Set and hit
       cache.set('test-key', entry);
       cache.get<String>('test-key');
@@ -201,27 +212,29 @@ void main() {
 
     test('should evict oldest entries when max size exceeded', () {
       const options = QueryOptions<String>();
-      
+
       // Fill cache to max size
       for (int i = 0; i < 5; i++) {
         final entry = QueryCacheEntry<String>(
           data: 'data-$i',
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set('key-$i', entry);
       }
-      
+
       expect(cache.size, 5);
-      
+
       // Add one more to trigger eviction
       final newEntry = QueryCacheEntry<String>(
         data: 'new-data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
       cache.set('new-key', newEntry);
-      
+
       expect(cache.size, 5);
       expect(cache.get<String>('key-0'), null); // Should be evicted
       expect(cache.get<String>('new-key'), isNotNull); // Should exist
@@ -233,12 +246,13 @@ void main() {
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       cache.set('test-key', entry);
       expect(cache.containsKey('test-key'), true);
-      
+
       cache.remove('test-key');
       expect(cache.containsKey('test-key'), false);
       expect(cache.get<String>('test-key'), null);
@@ -246,46 +260,51 @@ void main() {
 
     test('should clear all entries', () {
       const options = QueryOptions<String>();
-      
+
       for (int i = 0; i < 3; i++) {
         final entry = QueryCacheEntry<String>(
           data: 'data-$i',
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set('key-$i', entry);
       }
-      
+
       expect(cache.size, 3);
-      
+
       cache.clear();
       expect(cache.size, 0);
       expect(cache.keys, isEmpty);
     });
 
     test('should cleanup expired entries', () {
-      const shortCacheOptions = QueryOptions<String>(cacheTime: Duration(milliseconds: 1));
-      const longCacheOptions = QueryOptions<String>(cacheTime: Duration(hours: 1));
-      
+      const shortCacheOptions =
+          QueryOptions<String>(cacheTime: Duration(milliseconds: 1));
+      const longCacheOptions =
+          QueryOptions<String>(cacheTime: Duration(hours: 1));
+
       final expiredEntry = QueryCacheEntry<String>(
         data: 'expired data',
         fetchedAt: DateTime.now().subtract(const Duration(minutes: 1)),
-        options: shortCacheOptions,
+        cacheTime: shortCacheOptions.cacheTime,
+        staleTime: shortCacheOptions.staleTime,
       );
-      
+
       final freshEntry = QueryCacheEntry<String>(
         data: 'fresh data',
         fetchedAt: DateTime.now(),
-        options: longCacheOptions,
+        cacheTime: longCacheOptions.cacheTime,
+        staleTime: longCacheOptions.staleTime,
       );
-      
+
       cache.set('expired-key', expiredEntry);
       cache.set('fresh-key', freshEntry);
-      
+
       expect(cache.size, 2);
-      
+
       final cleanedCount = cache.cleanup();
-      
+
       expect(cleanedCount, 1);
       expect(cache.size, 1);
       expect(cache.containsKey('expired-key'), false);
@@ -294,27 +313,28 @@ void main() {
 
     test('should remove entries by pattern', () {
       const options = QueryOptions<String>();
-      
+
       final entries = [
         ('user-1', 'user data 1'),
         ('user-2', 'user data 2'),
         ('post-1', 'post data 1'),
         ('post-2', 'post data 2'),
       ];
-      
+
       for (final (key, data) in entries) {
         final entry = QueryCacheEntry<String>(
           data: data,
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set(key, entry);
       }
-      
+
       expect(cache.size, 4);
-      
+
       final removedCount = cache.removeByPattern('user');
-      
+
       expect(removedCount, 2);
       expect(cache.size, 2);
       expect(cache.containsKey('user-1'), false);
@@ -327,9 +347,12 @@ void main() {
       final error = Exception('Test error');
       final stackTrace = StackTrace.current;
       const options = QueryOptions<String>();
-      
-      cache.setError<String>('error-key', error, stackTrace: stackTrace, options: options);
-      
+
+      cache.setError<String>('error-key', error,
+          stackTrace: stackTrace,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime);
+
       final retrieved = cache.get<String>('error-key');
       expect(retrieved, isNotNull);
       expect(retrieved!.hasError, true);
@@ -342,19 +365,20 @@ void main() {
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       // Generate some stats
       cache.get<String>('missing-key'); // Miss
       cache.set('test-key', entry);
       cache.get<String>('test-key'); // Hit
-      
+
       expect(cache.stats.hitCount, 1);
       expect(cache.stats.missCount, 1);
-      
+
       cache.resetStats();
-      
+
       expect(cache.stats.hitCount, 0);
       expect(cache.stats.missCount, 0);
       expect(cache.stats.evictionCount, 0);
@@ -362,17 +386,18 @@ void main() {
 
     test('should get all cache keys', () {
       const options = QueryOptions<String>();
-      
+
       final keys = ['key-1', 'key-2', 'key-3'];
       for (final key in keys) {
         final entry = QueryCacheEntry<String>(
           data: 'data for $key',
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set(key, entry);
       }
-      
+
       final cacheKeys = cache.keys;
       expect(cacheKeys.length, 3);
       for (final key in keys) {
@@ -385,47 +410,50 @@ void main() {
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       // Test basic operations
       cache.set('test-key', entry);
       expect(cache.containsKey('test-key'), true);
-      
+
       final retrieved = cache.get<String>('test-key');
       expect(retrieved, isNotNull);
       expect(retrieved!.data, 'test data');
-      
+
       cache.remove('test-key');
       expect(cache.containsKey('test-key'), false);
     });
 
     test('should move accessed entries to end (LRU)', () {
       const options = QueryOptions<String>();
-      
+
       // Fill cache
       for (int i = 0; i < 3; i++) {
         final entry = QueryCacheEntry<String>(
           data: 'data-$i',
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set('key-$i', entry);
       }
-      
+
       // Access first entry to move it to end
       cache.get<String>('key-0');
-      
+
       // Add entries until eviction
       for (int i = 3; i < 6; i++) {
         final entry = QueryCacheEntry<String>(
           data: 'data-$i',
           fetchedAt: DateTime.now(),
-          options: options,
+          cacheTime: options.cacheTime,
+          staleTime: options.staleTime,
         );
         cache.set('key-$i', entry);
       }
-      
+
       // key-0 should still exist because it was accessed recently
       expect(cache.get<String>('key-0'), isNotNull);
       // key-1 should be evicted because it wasn't accessed
@@ -435,27 +463,28 @@ void main() {
 
   group('getGlobalQueryCache', () {
     test('should return singleton instance', () {
-      final cache1 = getGlobalQueryCache();
-      final cache2 = getGlobalQueryCache();
-      
+      final cache1 = MemoryQueryCache();
+      final cache2 = MemoryQueryCache();
+
       expect(identical(cache1, cache2), true);
     });
 
     test('should maintain state across calls', () {
-      final cache = getGlobalQueryCache();
-      
+      final cache = MemoryQueryCache();
+
       const options = QueryOptions<String>();
       final entry = QueryCacheEntry<String>(
         data: 'test data',
         fetchedAt: DateTime.now(),
-        options: options,
+        cacheTime: options.cacheTime,
+        staleTime: options.staleTime,
       );
-      
+
       cache.set('test-key', entry);
-      
-      final anotherCacheReference = getGlobalQueryCache();
+
+      final anotherCacheReference = MemoryQueryCache();
       final retrieved = anotherCacheReference.get<String>('test-key');
-      
+
       expect(retrieved, isNotNull);
       expect(retrieved!.data, 'test data');
     });

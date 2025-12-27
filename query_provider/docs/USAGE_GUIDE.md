@@ -657,7 +657,7 @@ class UserListWithErrorHandling extends ConsumerWidget {
 class CacheManagementExample extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final queryClient = ref.read(queryClientProvider);
+    final queryClient = ref.read(memoryQueryClientProvider);
 
     return Column(
       children: [
@@ -705,7 +705,7 @@ final updateUserMutationProvider = MutationProvider<User, UpdateUserRequest>(
   mutationFn: (request) => ApiService.updateUser(request.id, request.data),
   options: MutationOptions<User, UpdateUserRequest>(
     onMutate: (variables) async {
-      final queryClient = ref.read(queryClientProvider);
+      final queryClient = ref.read(memoryQueryClientProvider);
       
       // Cancel any outgoing refetches
       // (so they don't overwrite our optimistic update)
@@ -727,7 +727,7 @@ final updateUserMutationProvider = MutationProvider<User, UpdateUserRequest>(
       return previousUser;
     },
     onError: (error, variables, context) {
-      final queryClient = ref.read(queryClientProvider);
+      final queryClient = ref.read(memoryQueryClientProvider);
       
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context != null) {
@@ -735,7 +735,7 @@ final updateUserMutationProvider = MutationProvider<User, UpdateUserRequest>(
       }
     },
     onSuccess: (data, variables) {
-      final queryClient = ref.read(queryClientProvider);
+      final queryClient = ref.read(memoryQueryClientProvider);
       
       // Update with the actual server response
       queryClient.setQueryData(userQueryProvider(variables.id), data);

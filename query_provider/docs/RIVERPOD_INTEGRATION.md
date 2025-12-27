@@ -59,7 +59,7 @@ Future<User> createUser(CreateUserRef ref, Map<String, dynamic> userData) async 
     options: MutationOptions<User, Map<String, dynamic>>(
       // 乐观更新：立即更新 UI
       onMutate: (variables) async {
-        final queryClient = ref.read(queryClientProvider);
+        final queryClient = ref.read(memoryQueryClientProvider);
         final currentUsers = queryClient.getQueryData<List<User>>('users');
         if (currentUsers != null) {
           final newUser = User(
@@ -72,12 +72,12 @@ Future<User> createUser(CreateUserRef ref, Map<String, dynamic> userData) async 
       },
       // 成功回调：使缓存失效获取最新数据
       onSuccess: (user, variables) async {
-        final queryClient = ref.read(queryClientProvider);
+        final queryClient = ref.read(memoryQueryClientProvider);
         queryClient.invalidateQueries('users');
       },
       // 错误回调：回滚乐观更新
       onError: (error, variables, stackTrace) async {
-        final queryClient = ref.read(queryClientProvider);
+        final queryClient = ref.read(memoryQueryClientProvider);
         queryClient.invalidateQueries('users');
       },
       retry: 2,

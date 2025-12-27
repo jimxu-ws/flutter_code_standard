@@ -38,9 +38,9 @@ class PostsState {
   /// Get all posts from all pages
   List<Post> get allPosts {
     return switch (infiniteQueryState) {
-      InfiniteQuerySuccess<PostPage> success => success.pages.expand((page) => page.posts).toList(),
-      InfiniteQueryFetchingNextPage<PostPage> fetching => fetching.pages.expand((page) => page.posts).toList(),
-      InfiniteQueryFetchingPreviousPage<PostPage> fetching => fetching.pages.expand((page) => page.posts).toList(),
+      final InfiniteQuerySuccess<PostPage> success => success.pages.expand((page) => page.posts).toList(),
+      final InfiniteQueryFetchingNextPage<PostPage> fetching => fetching.pages.expand((page) => page.posts).toList(),
+      final InfiniteQueryFetchingPreviousPage<PostPage> fetching => fetching.pages.expand((page) => page.posts).toList(),
       _ => [],
     };
   }
@@ -53,39 +53,41 @@ class PostsState {
   }
 }
 
+// Create the infinite query provider
+final _postsInfiniteQueryProvider = infiniteQueryProvider<PostPage, int>(
+  name: 'posts-infinite',
+  queryFn: (ref, pageParam) => ApiService.fetchPosts(page: pageParam),
+  initialPageParam: 1,
+  options: InfiniteQueryOptions<PostPage, int>(
+    getNextPageParam: (lastPage, allPages) {
+      return lastPage.hasMore ? lastPage.page + 1 : null;
+    },
+    staleTime: const Duration(minutes: 2),
+    cacheTime: const Duration(minutes: 10),
+  ),
+);
+
 /// Unified provider that manages all post operations
-class UnifiedPostsNotifier extends StateNotifier<PostsState> {
-  UnifiedPostsNotifier(this._ref) : super(PostsState(
-    infiniteQueryState: InfiniteQueryIdle<PostPage>(),
-    createMutationState: MutationIdle<Post>(),
-    updateMutationState: MutationIdle<Post>(),
-    deleteMutationState: MutationIdle<void>(),
-  )) {
+class UnifiedPostsNotifier extends Notifier<PostsState> {
+  UnifiedPostsNotifier() : super() {
     _initializeInfiniteQuery();
   }
 
-  final Ref _ref;
-  
-  // Internal infinite query notifier
-  late final InfiniteQueryNotifier<PostPage, int> _infiniteQueryNotifier;
+  @override
+  PostsState build() {
+    _initializeInfiniteQuery();
+    return const PostsState(
+      infiniteQueryState: InfiniteQueryIdle<PostPage>(),
+      createMutationState: MutationIdle<Post>(),
+      updateMutationState: MutationIdle<Post>(),
+      deleteMutationState: MutationIdle<void>(),
+    );
+  }
 
   void _initializeInfiniteQuery() {
-    _infiniteQueryNotifier = InfiniteQueryNotifier<PostPage, int>(
-      queryKey: 'posts-infinite',
-      queryFn: (pageParam) => ApiService.fetchPosts(page: pageParam),
-      initialPageParam: 1,
-      options: InfiniteQueryOptions<PostPage, int>(
-        getNextPageParam: (lastPage, allPages) {
-          return lastPage.hasMore ? lastPage.page + 1 : null;
-        },
-        staleTime: const Duration(minutes: 2),
-        cacheTime: const Duration(minutes: 10),
-      ),
-    );
-
     // Listen to infinite query state changes
-    _infiniteQueryNotifier.addListener((queryState) {
-      state = state.copyWith(infiniteQueryState: queryState);
+    ref.listen(_postsInfiniteQueryProvider, (previous, next) {
+      state = state.copyWith(infiniteQueryState: next);
     });
   }
 
@@ -94,18 +96,18 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
     // The infinite query notifier automatically fetches on initialization
     // if refetchOnMount is true (which is the default)
     if (state.infiniteQueryState is InfiniteQueryIdle) {
-      await _infiniteQueryNotifier.refetch();
+      await ref.read(_postsInfiniteQueryProvider.notifier).refetch();
     }
   }
 
   /// Fetch next page
   Future<void> fetchNextPage() async {
-    await _infiniteQueryNotifier.fetchNextPage();
+    await ref.read(_postsInfiniteQueryProvider.notifier).fetchNextPage();
   }
 
   /// Refetch all posts
   Future<void> refetch() async {
-    await _infiniteQueryNotifier.refetch();
+    await ref.read(_postsInfiniteQueryProvider.notifier).refetch();
   }
 
   /// Fetch user posts
@@ -132,7 +134,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   /// Create a new post with optimistic updates
   Future<Post> createPost(Map<String, dynamic> variables) async {
     // Set loading state
-    state = state.copyWith(createMutationState: MutationLoading<Post>());
+    state = state.copyWith(createMutationState: const MutationLoading<Post>());
 
     try {
       // Optimistic update
@@ -171,7 +173,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   /// Update a post with optimistic updates
   Future<Post> updatePost(int postId, Map<String, dynamic> variables) async {
     // Set loading state
-    state = state.copyWith(updateMutationState: MutationLoading<Post>());
+    state = state.copyWith(updateMutationState: const MutationLoading<Post>());
 
     // Store original post for rollback
     Post? originalPost;
@@ -208,7 +210,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   /// Delete a post with optimistic updates
   Future<void> deletePost(int postId) async {
     // Set loading state
-    state = state.copyWith(deleteMutationState: MutationLoading<void>());
+    state = state.copyWith(deleteMutationState: const MutationLoading<void>());
 
     // Store original post for rollback
     Post? originalPost;
@@ -226,7 +228,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
       await ApiService.deletePost(postId);
 
       // Update success state
-      state = state.copyWith(deleteMutationState: MutationSuccess(null));
+      state = state.copyWith(deleteMutationState: const MutationSuccess(null));
     } catch (error, stackTrace) {
       // Rollback optimistic update
       if (originalPost != null && originalPageIndex != null && originalPostIndex != null) {
@@ -244,20 +246,20 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
 
   /// Reset mutation states
   void resetCreateMutation() {
-    state = state.copyWith(createMutationState: MutationIdle<Post>());
+    state = state.copyWith(createMutationState: const MutationIdle<Post>());
   }
 
   void resetUpdateMutation() {
-    state = state.copyWith(updateMutationState: MutationIdle<Post>());
+    state = state.copyWith(updateMutationState: const MutationIdle<Post>());
   }
 
   void resetDeleteMutation() {
-    state = state.copyWith(deleteMutationState: MutationIdle<void>());
+    state = state.copyWith(deleteMutationState: const MutationIdle<void>());
   }
 
   // Helper methods for optimistic updates
   void _addOptimisticPost(Post post) {
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       if (success.pages.isNotEmpty) {
         final firstPage = success.pages[0];
         final updatedPosts = [post, ...firstPage.posts];
@@ -282,7 +284,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   }
 
   void _replaceOptimisticPost(Post optimisticPost, Post realPost) {
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       final updatedPages = success.pages.map((page) {
         final updatedPosts = page.posts.map((p) {
           return p.id == optimisticPost.id ? realPost : p;
@@ -306,7 +308,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   }
 
   void _removeOptimisticPosts() {
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       final updatedPages = success.pages.map((page) {
         final updatedPosts = page.posts.where((p) => p.id >= 0).toList();
         return PostPage(
@@ -330,7 +332,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   Post? _updatePostOptimistically(int postId, Map<String, dynamic> variables) {
     Post? originalPost;
 
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       final updatedPages = success.pages.map((page) {
         final updatedPosts = page.posts.map((post) {
           if (post.id == postId) {
@@ -363,7 +365,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   }
 
   void _replacePost(int postId, Post newPost) {
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       final updatedPages = success.pages.map((page) {
         final updatedPosts = page.posts.map((post) {
           return post.id == postId ? newPost : post;
@@ -401,7 +403,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
     int? pageIndex;
     int? postIndex;
 
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       final updatedPages = <PostPage>[];
       
       for (int i = 0; i < success.pages.length; i++) {
@@ -453,7 +455,7 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
   }
 
   void _restoreDeletedPost(Post post, int pageIndex, int postIndex) {
-    if (state.infiniteQueryState case InfiniteQuerySuccess<PostPage> success) {
+    if (state.infiniteQueryState case final InfiniteQuerySuccess<PostPage> success) {
       if (pageIndex < success.pages.length) {
         final updatedPages = List<PostPage>.from(success.pages);
         final page = updatedPages[pageIndex];
@@ -485,16 +487,11 @@ class UnifiedPostsNotifier extends StateNotifier<PostsState> {
     state = state.copyWith(userPostsCache: updatedUserCache);
   }
 
-  @override
-  void dispose() {
-    _infiniteQueryNotifier.dispose();
-    super.dispose();
-  }
 }
 
 /// The unified posts provider
-final unifiedPostsProvider = StateNotifierProvider<UnifiedPostsNotifier, PostsState>((ref) {
-  return UnifiedPostsNotifier(ref);
+final unifiedPostsProvider = NotifierProvider<UnifiedPostsNotifier, PostsState>(() {
+  return UnifiedPostsNotifier();
 });
 
 /// Convenience providers for specific aspects
